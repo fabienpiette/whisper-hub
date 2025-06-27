@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+CLAUDE.md
+*.md
+
+# Environment files
+.env
+.env.local
+.env.example
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Build artifacts
+bin/
+dist/
+
+# Python (legacy)
+transcribe.py
+__pycache__
+*.pyc
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml

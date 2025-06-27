@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper Hub</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Whisper Hub</h1>
+            <p>Upload your audio file and get instant transcription</p>
+        </div>
+        
+        <div class="content">
+            <form hx-post="/transcribe" hx-target="#result" hx-encoding="multipart/form-data" hx-indicator="#loading">
+                <div class="upload-container">
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-icon">📁</div>
+                        <div class="upload-text">Drop your audio file here</div>
+                        <div class="upload-subtext">or click to browse (MP3, WAV, M4A, OGG, FLAC, AAC)</div>
+                        <input type="file" name="audio" accept="audio/*" required class="file-input" id="file-input">
+                    </div>
+                    <div class="file-info" id="file-info">
+                        <strong>Selected file:</strong> <span id="file-name"></span><br>
+                        <strong>Size:</strong> <span id="file-size"></span>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn" id="submit-btn">
+                    🎯 Transcribe Audio
+                </button>
+            </form>
+            
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# Environment variables (if using .env files locally)
+.env
+.env.local
+
+# Build artifacts
+bin/
+dist/
+transcribe-server
+whisper-hub-server
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+# go.sum - Actually we should commit go.sum for reproducible builds
+
+# Legacy Python
+transcribe.py
+__pycache__/
+*.pyc
+
+# Temporary files
+tmp/
+temp/
+
+# Claude Code project files
+CLAUDE.md
+.claude/
