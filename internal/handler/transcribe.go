@@ -19,8 +19,9 @@ import (
 
 type TranscribeHandler struct {
 	transcriber     *service.Transcriber
+	videoConverter  *service.VideoConverter
 	tempManager     *storage.TempFileManager
-	validator       *validation.AudioFileValidator
+	validator       *validation.FileValidator
 	responseWriter  *response.Writer
 	templateService interfaces.TemplateService
 	config          *config.Config
@@ -30,8 +31,9 @@ type TranscribeHandler struct {
 func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateService interfaces.TemplateService) *TranscribeHandler {
 	return &TranscribeHandler{
 		transcriber:     service.NewTranscriber(cfg.OpenAIAPIKey),
+		videoConverter:  service.NewVideoConverter(),
 		tempManager:     storage.NewTempFileManager(cfg.TempDir),
-		validator:       validation.NewAudioFileValidator(cfg.UploadMaxSize),
+		validator:       validation.NewFileValidator(cfg.UploadMaxSize),
 		responseWriter:  response.NewWriter(),
 		templateService: templateService,
 		config:          cfg,
@@ -87,10 +89,15 @@ func (h *TranscribeHandler) parseAndValidateForm(r *http.Request) (file multipar
 		return nil, nil, &errors.AppError{Code: http.StatusBadRequest, Message: constants.ErrFileTooLarge, Err: err}
 	}
 
+	// Try to get file from either 'audio' or 'file' field for backward compatibility
 	file, header, err = r.FormFile(constants.FormFieldAudio)
 	if err != nil {
-		h.logger.Warn("no audio file in request", "error", err)
-		return nil, nil, &errors.AppError{Code: http.StatusBadRequest, Message: constants.ErrNoAudioFile, Err: err}
+		// Try alternative field name
+		file, header, err = r.FormFile(constants.FormFieldFile)
+		if err != nil {
+			h.logger.Warn("no file in request", "error", err)
+			return nil, nil, &errors.AppError{Code: http.StatusBadRequest, Message: constants.ErrNoAudioFile, Err: err}
+		}
 	}
 
 	if err := h.validator.ValidateFile(header); err != nil {
@@ -101,7 +108,7 @@ func (h *TranscribeHandler) parseAndValidateForm(r *http.Request) (file multipar
 	return file, header, nil
 }
 
-// processTranscription handles file saving and transcription
+// processTranscription handles file saving, conversion (if needed), and transcription
 func (h *TranscribeHandler) processTranscription(file multipart.File, header *multipart.FileHeader) (string, error) {
 	filePath, err := h.tempManager.SaveUploadedFile(file, header)
 	if err != nil {
@@ -110,11 +117,34 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 	}
 	defer h.tempManager.Cleanup(filePath)
 
+	// Determine file type and handle conversion if needed
+	audioFilePath := filePath
+	var convertedAudioPath string
+	
+	if h.validator.IsVideoFile(header.Filename) {
+		h.logger.Info("video file detected, converting to audio", "filename", header.Filename)
+		
+		ctx, cancel := context.WithTimeout(context.Background(), h.videoConverter.GetConversionTimeout())
+		defer cancel()
+		
+		convertedPath, err := h.videoConverter.ConvertVideoToAudio(ctx, filePath)
+		if err != nil {
+			h.logger.Error("video conversion failed", "error", err, "filename", header.Filename)
+			return "", &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrVideoConversionFailed, Err: err}
+		}
+		
+		audioFilePath = convertedPath
+		convertedAudioPath = convertedPath
+		defer h.videoConverter.CleanupConvertedFile(convertedAudioPath)
+		
+		h.logger.Info("video conversion completed", "filename", header.Filename, "audio_path", convertedPath)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), constants.TranscriptionTimeout)
 	defer cancel()
 
 	start := time.Now()
-	transcription, err := h.transcriber.TranscribeFile(ctx, filePath)
+	transcription, err := h.transcriber.TranscribeFile(ctx, audioFilePath)
 	duration := time.Since(start)
 	
 	if err != nil {
@@ -130,6 +160,7 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 		"filename", header.Filename,
 		"duration_ms", duration.Milliseconds(),
 		"transcript_length", len(transcription),
+		"was_video", h.validator.IsVideoFile(header.Filename),
 	)
 
 	return transcription, nil

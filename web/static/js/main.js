@@ -38,10 +38,22 @@ function showFileInfo(file) {
     fileSize.textContent = formatFileSize(file.size);
     fileInfo.classList.add('show');
     
+    // Determine file type for appropriate messaging
+    const fileType = getFileType(file.name);
+    const icon = fileType === 'video' ? '🎬' : '🎵';
+    
     // Update upload area
     uploadArea.querySelector('.upload-text').textContent = 'File selected!';
-    uploadArea.querySelector('.upload-subtext').textContent = 'Click transcribe or drop a different file';
-    uploadArea.querySelector('.upload-icon').textContent = '✅';
+    uploadArea.querySelector('.upload-subtext').textContent = fileType === 'video' ? 
+        'Video will be converted to audio for transcription' : 
+        'Click transcribe or drop a different file';
+    uploadArea.querySelector('.upload-icon').textContent = icon + ' ✅';
+}
+
+function getFileType(filename) {
+    const videoExtensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'];
+    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    return videoExtensions.includes(ext) ? 'video' : 'audio';
 }
 
 function formatFileSize(bytes) {
@@ -54,14 +66,17 @@ function formatFileSize(bytes) {
 
 // Handle form submission
 document.querySelector('form').addEventListener('htmx:beforeRequest', () => {
+    const file = fileInput.files[0];
+    const fileType = file ? getFileType(file.name) : 'audio';
+    
     submitBtn.disabled = true;
-    submitBtn.textContent = '🔄 Transcribing...';
+    submitBtn.textContent = fileType === 'video' ? '🔄 Converting & Transcribing...' : '🔄 Transcribing...';
     uploadArea.classList.add('uploading');
 });
 
 document.querySelector('form').addEventListener('htmx:afterRequest', () => {
     submitBtn.disabled = false;
-    submitBtn.textContent = '🎯 Transcribe Audio';
+    submitBtn.textContent = '🎯 Transcribe File';
     uploadArea.classList.remove('uploading');
 });
 

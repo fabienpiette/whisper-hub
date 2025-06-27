@@ -29,6 +29,11 @@ var SupportedAudioExtensions = []string{
 	".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac",
 }
 
+// Supported video file extensions  
+var SupportedVideoExtensions = []string{
+	".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v",
+}
+
 // HTTP headers
 const (
 	HeaderRequestID      = "X-Request-ID"
@@ -43,7 +48,7 @@ const (
 // Error messages
 const (
 	ErrNoAudioFile      = "No audio file provided"
-	ErrInvalidFileType  = "Invalid file type. Please upload an audio file."
+	ErrInvalidFileType  = "Invalid file type. Please upload an audio or video file."
 	ErrFileTooLarge     = "File too large or invalid form data"
 	ErrTranscribeFailed = "Transcription failed. Please try again."
 	ErrSaveFileFailed   = "Failed to save uploaded file"
@@ -51,6 +56,7 @@ const (
 	ErrRateLimitExceeded = "Rate limit exceeded"
 	ErrMethodNotAllowed = "Method not allowed"
 	ErrMetricsUnavailable = "metrics unavailable"
+	ErrVideoConversionFailed = "Video conversion failed. Please try again."
 )
 
 // Service info
@@ -63,4 +69,5 @@ const (
 // Form field names
 const (
 	FormFieldAudio = "audio"
+	FormFieldFile  = "file" // Generic field for audio/video files
 )

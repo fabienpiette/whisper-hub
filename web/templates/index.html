@@ -11,7 +11,7 @@
     <div class="container">
         <div class="header">
             <h1>🎵 Whisper Hub</h1>
-            <p>Upload your audio file and get instant transcription</p>
+            <p>Upload your audio or video file and get instant transcription</p>
         </div>
         
         <div class="content">
@@ -19,9 +19,9 @@
                 <div class="upload-container">
                     <div class="upload-area" id="upload-area">
                         <div class="upload-icon">📁</div>
-                        <div class="upload-text">Drop your audio file here</div>
-                        <div class="upload-subtext">or click to browse (MP3, WAV, M4A, OGG, FLAC, AAC)</div>
-                        <input type="file" name="audio" accept="audio/*" required class="file-input" id="file-input">
+                        <div class="upload-text">Drop your audio or video file here</div>
+                        <div class="upload-subtext">or click to browse (Audio: MP3, WAV, M4A, OGG, FLAC, AAC | Video: MP4, AVI, MOV, MKV, WEBM)</div>
+                        <input type="file" name="audio" accept="audio/*,video/*" required class="file-input" id="file-input">
                     </div>
                     <div class="file-info" id="file-info">
                         <strong>Selected file:</strong> <span id="file-name"></span><br>
@@ -30,7 +30,7 @@
                 </div>
                 
                 <button type="submit" class="btn" id="submit-btn">
-                    🎯 Transcribe Audio
+                    🎯 Transcribe File
                 </button>
             </form>
             
