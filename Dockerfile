@@ -30,11 +30,13 @@ RUN addgroup -g 1001 appuser && \
 RUN mkdir -p /tmp/whisper-hub && \
     chown -R appuser:appuser /tmp/whisper-hub
 
-# Copy the binary from builder stage
+# Copy the binary and web assets from builder stage
 COPY --from=builder /app/whisper-hub-server .
+COPY --from=builder /app/web ./web
 
 # Change ownership to non-root user
-RUN chown appuser:appuser whisper-hub-server
+RUN chown -R appuser:appuser . && \
+    chown -R appuser:appuser ./web
 
 # Switch to non-root user
 USER appuser
