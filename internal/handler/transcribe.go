@@ -31,7 +31,7 @@ type TranscribeHandler struct {
 func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateService interfaces.TemplateService) *TranscribeHandler {
 	return &TranscribeHandler{
 		transcriber:     service.NewTranscriber(cfg.OpenAIAPIKey),
-		videoConverter:  service.NewVideoConverter(),
+		videoConverter:  service.NewVideoConverterWithLogger(logger),
 		tempManager:     storage.NewTempFileManager(cfg.TempDir),
 		validator:       validation.NewFileValidator(cfg.UploadMaxSize),
 		responseWriter:  response.NewWriter(),

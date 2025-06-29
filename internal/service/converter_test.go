@@ -19,8 +19,8 @@ func TestNewVideoConverter(t *testing.T) {
 		t.Errorf("expected ffmpegPath 'ffmpeg', got %s", converter.ffmpegPath)
 	}
 	
-	if converter.timeout != 5*time.Minute {
-		t.Errorf("expected timeout 5m, got %v", converter.timeout)
+	if converter.timeout != 10*time.Minute {
+		t.Errorf("expected timeout 10m, got %v", converter.timeout)
 	}
 }
 
@@ -28,8 +28,8 @@ func TestVideoConverter_GetConversionTimeout(t *testing.T) {
 	converter := NewVideoConverter()
 	
 	timeout := converter.GetConversionTimeout()
-	if timeout != 5*time.Minute {
-		t.Errorf("expected timeout 5m, got %v", timeout)
+	if timeout != 10*time.Minute {
+		t.Errorf("expected timeout 10m, got %v", timeout)
 	}
 }
 
