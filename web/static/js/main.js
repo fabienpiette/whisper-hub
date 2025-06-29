@@ -228,10 +228,10 @@ function copyTranscript() {
         const btn = event.target;
         const originalText = btn.textContent;
         btn.textContent = '✅ Copied!';
-        btn.style.background = '#28a745';
+        btn.style.transform = 'scale(0.95)';
         setTimeout(() => {
             btn.textContent = originalText;
-            btn.style.background = '#28a745';
+            btn.style.transform = '';
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy text: ', err);
@@ -246,8 +246,10 @@ function copyTranscript() {
             const btn = event.target;
             const originalText = btn.textContent;
             btn.textContent = '✅ Copied!';
+            btn.style.transform = 'scale(0.95)';
             setTimeout(() => {
                 btn.textContent = originalText;
+                btn.style.transform = '';
             }, 2000);
         } catch (err) {
             console.error('Fallback copy failed: ', err);
@@ -287,9 +289,11 @@ function downloadTranscript(originalFilename) {
     const btn = event.target;
     const originalText = btn.textContent;
     btn.textContent = '✅ Downloaded!';
-    btn.style.background = '#28a745';
+    btn.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+    btn.style.transform = 'scale(0.95)';
     setTimeout(() => {
         btn.textContent = originalText;
-        btn.style.background = '#17a2b8';
+        btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        btn.style.transform = '';
     }, 2000);
 }

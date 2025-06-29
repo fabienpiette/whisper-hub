@@ -63,7 +63,7 @@ func (w *Writer) WriteTranscriptionResult(rw http.ResponseWriter, transcription,
 				📋 Copy Transcript
 			</button>
 			<button class="download-btn" onclick="downloadTranscript('%s')">
-				💾 Download as TXT
+				📄 Download Transcript
 			</button>
 		</div>
 	</div>`, 

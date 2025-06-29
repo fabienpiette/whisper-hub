@@ -351,22 +351,25 @@ body {
 
 .action-buttons {
     display: flex;
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
     flex-wrap: wrap;
+    justify-content: center;
 }
 
 .copy-btn, .download-btn {
     color: white;
     border: none;
-    padding: 0.75rem 1.25rem;
-    border-radius: 8px;
+    padding: 1rem 2rem;
+    border-radius: 12px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-weight: 500;
     transition: all 0.3s ease;
     flex: 1;
-    min-width: 140px;
+    min-width: 160px;
+    position: relative;
+    overflow: hidden;
 }
 
 .copy-btn {
@@ -375,8 +378,8 @@ body {
 
 .copy-btn:hover {
     background: #218838;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
 }
 
 .download-btn {
@@ -385,8 +388,8 @@ body {
 
 .download-btn:hover {
     background: #138496;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(23, 162, 184, 0.3);
 }
 
 @media (max-width: 768px) {
@@ -414,11 +417,14 @@ body {
     
     .action-buttons {
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 1rem;
+        margin-top: 1rem;
     }
     
     .copy-btn, .download-btn {
         min-width: unset;
         flex: none;
+        padding: 1rem 1.5rem;
+        font-size: 0.95rem;
     }
 }
