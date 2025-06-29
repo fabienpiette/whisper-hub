@@ -8,15 +8,19 @@ import (
 )
 
 func TestNewFileValidator(t *testing.T) {
-	maxSize := int64(1024 * 1024)
-	validator := NewFileValidator(maxSize)
+	maxAudioSize := int64(1024 * 1024)
+	validator := NewFileValidator(maxAudioSize)
 	
 	if validator == nil {
 		t.Fatal("NewFileValidator returned nil")
 	}
 	
-	if validator.maxSize != maxSize {
-		t.Errorf("expected maxSize %d, got %d", maxSize, validator.maxSize)
+	if validator.maxAudioSize != maxAudioSize {
+		t.Errorf("expected maxAudioSize %d, got %d", maxAudioSize, validator.maxAudioSize)
+	}
+	
+	if validator.maxVideoSize != constants.MaxVideoFileSize {
+		t.Errorf("expected maxVideoSize %d, got %d", constants.MaxVideoFileSize, validator.maxVideoSize)
 	}
 	
 	if len(validator.audioExtensions) == 0 {
@@ -123,8 +127,8 @@ func TestFileValidator_IsVideoFile(t *testing.T) {
 }
 
 func TestFileValidator_ValidateFile(t *testing.T) {
-	maxSize := int64(1024 * 1024) // 1MB
-	validator := NewFileValidator(maxSize)
+	maxAudioSize := int64(1024 * 1024) // 1MB
+	validator := NewFileValidator(maxAudioSize)
 	
 	tests := []struct {
 		name     string
@@ -145,6 +149,14 @@ func TestFileValidator_ValidateFile(t *testing.T) {
 			header: &multipart.FileHeader{
 				Filename: "test.mp4",
 				Size:     1000,
+			},
+			wantErr: false,
+		},
+		{
+			name: "large video file within limit",
+			header: &multipart.FileHeader{
+				Filename: "test.mp4",
+				Size:     1024 * 1024 * 1024, // 1GB
 			},
 			wantErr: false,
 		},
@@ -173,10 +185,21 @@ func TestFileValidator_ValidateFile(t *testing.T) {
 			},
 		},
 		{
-			name: "file too large",
+			name: "audio file too large",
 			header: &multipart.FileHeader{
 				Filename: "test.mp3",
-				Size:     maxSize + 1,
+				Size:     maxAudioSize + 1,
+			},
+			wantErr: true,
+			errCheck: func(err error) bool {
+				return err.Error() != "" // Just check that error exists, validation errors are wrapped
+			},
+		},
+		{
+			name: "video file too large",
+			header: &multipart.FileHeader{
+				Filename: "test.mp4",
+				Size:     constants.MaxVideoFileSize + 1,
 			},
 			wantErr: true,
 			errCheck: func(err error) bool {

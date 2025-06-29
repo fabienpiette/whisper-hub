@@ -18,9 +18,8 @@ Self-hosted web-based audio transcription using OpenAI's Whisper API. Perfect fo
 
 ## 🎯 Supported Formats
 
-**Audio:** MP3, WAV, M4A, OGG, FLAC, AAC  
-**Video:** MP4, AVI, MOV, MKV, WEBM, FLV, WMV, M4V  
-*Files up to 100MB*
+**Audio:** MP3, WAV, M4A, OGG, FLAC, AAC (up to 100MB)  
+**Video:** MP4, AVI, MOV, MKV, WEBM, FLV, WMV, M4V (up to 2GB)
 
 ## 🐳 Docker Deployment (Recommended)
 
@@ -86,7 +85,7 @@ Ideal for:
 |----------|---------|-------------|
 | `OPENAI_API_KEY` | *required* | Your OpenAI API key |
 | `PORT` | `8080` | Server port |
-| `UPLOAD_MAX_SIZE` | `100MB` | Max file size |
+| `UPLOAD_MAX_SIZE` | `100MB` | Max audio file size (video files: 2GB) |
 
 ## 🆘 Troubleshooting
 

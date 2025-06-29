@@ -5,6 +5,8 @@ import "time"
 // File size limits
 const (
 	DefaultUploadMaxSize = 52428800 // 50MB in bytes
+	MaxAudioFileSize = 100 * 1024 * 1024  // 100MB
+	MaxVideoFileSize = 2 * 1024 * 1024 * 1024  // 2GB
 	MegabytesToBytes     = 1024 * 1024
 )
 

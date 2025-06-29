@@ -189,6 +189,7 @@ func TestTranscribeHandler_ValidateFile(t *testing.T) {
 		// Size validation
 		{"test.mp3", 0, false},
 		{"test.mp3", cfg.UploadMaxSize + 1, false},
+		{"test.mp4", cfg.UploadMaxSize + 1, true}, // Video files have higher limit
 	}
 	
 	for _, tt := range tests {

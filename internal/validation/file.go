@@ -21,15 +21,17 @@ const (
 type FileValidator struct {
 	audioExtensions []string
 	videoExtensions []string
-	maxSize         int64
+	maxAudioSize    int64
+	maxVideoSize    int64
 }
 
 // NewFileValidator creates a new file validator
-func NewFileValidator(maxSize int64) *FileValidator {
+func NewFileValidator(maxAudioSize int64) *FileValidator {
 	return &FileValidator{
 		audioExtensions: constants.SupportedAudioExtensions,
 		videoExtensions: constants.SupportedVideoExtensions,
-		maxSize:         maxSize,
+		maxAudioSize:    maxAudioSize,
+		maxVideoSize:    constants.MaxVideoFileSize,
 	}
 }
 
@@ -39,11 +41,11 @@ func (v *FileValidator) ValidateFile(header *multipart.FileHeader) error {
 		return errors.NewValidationError("file", "no file provided")
 	}
 	
-	if err := v.validateSize(header.Size); err != nil {
+	if err := v.validateExtension(header.Filename); err != nil {
 		return err
 	}
 	
-	if err := v.validateExtension(header.Filename); err != nil {
+	if err := v.validateSize(header.Size, header.Filename); err != nil {
 		return err
 	}
 	
@@ -92,13 +94,21 @@ func (v *FileValidator) validateExtension(filename string) error {
 	return nil
 }
 
-func (v *FileValidator) validateSize(size int64) error {
-	if size > v.maxSize {
-		return errors.NewValidationError("file_size", constants.ErrFileTooLarge)
-	}
-	
+func (v *FileValidator) validateSize(size int64, filename string) error {
 	if size == 0 {
 		return errors.NewValidationError("file_size", "file cannot be empty")
+	}
+	
+	// Determine appropriate size limit based on file type
+	var maxSize int64
+	if v.IsVideoFile(filename) {
+		maxSize = v.maxVideoSize
+	} else {
+		maxSize = v.maxAudioSize
+	}
+	
+	if size > maxSize {
+		return errors.NewValidationError("file_size", constants.ErrFileTooLarge)
 	}
 	
 	return nil
