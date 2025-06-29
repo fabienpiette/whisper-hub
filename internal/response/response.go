@@ -20,16 +20,15 @@ func NewWriter() *Writer {
 // WriteError writes an error response as HTML
 func (w *Writer) WriteError(rw http.ResponseWriter, err error) {
 	var message string
-	var statusCode int = http.StatusInternalServerError
 	
 	if appErr, ok := err.(*errors.AppError); ok {
 		message = appErr.Message
-		statusCode = appErr.Code
 	} else {
 		message = err.Error()
 	}
 	
-	rw.WriteHeader(statusCode)
+	// Return 200 OK so HTMX processes the response and shows the error to the user
+	rw.WriteHeader(http.StatusOK)
 	fmt.Fprintf(rw, `<div class="error">❌ Error: %s</div>`, template.HTMLEscapeString(message))
 }
 

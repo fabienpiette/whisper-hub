@@ -52,6 +52,12 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 		return "", errors.NewInternalServerError("FFmpeg is not installed or not in PATH", nil)
 	}
 
+	// Pre-validate video file integrity
+	if err := c.validateVideoFile(ctx, videoPath); err != nil {
+		c.logger.Error("video file validation failed", "error", err, "filename", videoPath)
+		return "", err
+	}
+
 	// Create output path with .wav extension
 	audioPath := c.generateAudioPath(videoPath)
 
@@ -121,6 +127,44 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 func (c *VideoConverter) IsFFmpegAvailable() bool {
 	cmd := exec.Command(c.ffmpegPath, "-version")
 	return cmd.Run() == nil
+}
+
+// validateVideoFile checks if the video file is readable by FFmpeg
+func (c *VideoConverter) validateVideoFile(ctx context.Context, videoPath string) error {
+	// Create a quick probe command to check file integrity
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	
+	cmd := exec.CommandContext(ctx, c.ffmpegPath, 
+		"-hide_banner", 
+		"-loglevel", "error",
+		"-i", videoPath,
+		"-t", "1", // Only probe first second
+		"-f", "null", 
+		"-")
+	
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	
+	if err := cmd.Run(); err != nil {
+		stderrOutput := stderr.String()
+		
+		// Check for specific corruption indicators
+		if strings.Contains(stderrOutput, "moov atom not found") {
+			return errors.NewInternalServerError("Video file is corrupted or incomplete (missing moov atom)", err)
+		}
+		if strings.Contains(stderrOutput, "Invalid data found") {
+			return errors.NewInternalServerError("Video file contains invalid data or unsupported format", err)
+		}
+		if strings.Contains(stderrOutput, "No such file") {
+			return errors.NewFileError("open", videoPath, err)
+		}
+		
+		// Generic validation failure
+		return errors.NewInternalServerError("Video file validation failed: "+stderrOutput, err)
+	}
+	
+	return nil
 }
 
 // generateAudioPath creates the output audio file path

@@ -173,6 +173,17 @@ document.querySelector('form').addEventListener('htmx:afterRequest', () => {
     submitBtn.classList.remove('video-processing', 'audio-processing');
 });
 
+// Handle HTMX errors specifically
+document.querySelector('form').addEventListener('htmx:responseError', () => {
+    stopProgressAnimation();
+    // Reset button state on error
+    const hasValidFile = fileInput.files.length > 0 && !uploadArea.classList.contains('invalid');
+    submitBtn.disabled = !hasValidFile;
+    submitBtn.textContent = '🎯 Transcribe File';
+    uploadArea.classList.remove('uploading', 'video', 'audio');
+    submitBtn.classList.remove('video-processing', 'audio-processing');
+});
+
 // Enhanced progress animation for video conversion
 let progressInterval;
 let progressStage = 0;

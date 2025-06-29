@@ -69,8 +69,6 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 		"size", header.Size,
 	)
 
-	h.responseWriter.WriteLoading(w)
-
 	// Save and process file
 	transcription, err := h.processTranscription(file, header)
 	if err != nil {
