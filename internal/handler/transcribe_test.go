@@ -150,7 +150,7 @@ func TestTranscribeHandler_HandleTranscribe_InvalidFileType(t *testing.T) {
 	}
 }
 
-func TestTranscribeHandler_ValidateAudioFile(t *testing.T) {
+func TestTranscribeHandler_ValidateFile(t *testing.T) {
 	cfg := &config.Config{
 		OpenAIAPIKey:  "test-key",
 		UploadMaxSize: 50 * 1024 * 1024,
@@ -161,30 +161,46 @@ func TestTranscribeHandler_ValidateAudioFile(t *testing.T) {
 	
 	tests := []struct {
 		filename string
+		size     int64
 		valid    bool
 	}{
-		{"test.mp3", true},
-		{"test.MP3", true},
-		{"test.wav", true},
-		{"test.WAV", true},
-		{"test.m4a", true},
-		{"test.ogg", true},
-		{"test.flac", true},
-		{"test.aac", true},
-		{"test.txt", false},
-		{"test.jpg", false},
-		{"test.pdf", false},
-		{"test", false},
-		{"", false},
-		{"audio.mp3.txt", false},
+		// Audio files
+		{"test.mp3", 1000, true},
+		{"test.MP3", 1000, true},
+		{"test.wav", 1000, true},
+		{"test.WAV", 1000, true},
+		{"test.m4a", 1000, true},
+		{"test.ogg", 1000, true},
+		{"test.flac", 1000, true},
+		{"test.aac", 1000, true},
+		// Video files
+		{"test.mp4", 1000, true},
+		{"test.avi", 1000, true},
+		{"test.mov", 1000, true},
+		{"test.mkv", 1000, true},
+		{"test.webm", 1000, true},
+		// Invalid files
+		{"test.txt", 1000, false},
+		{"test.jpg", 1000, false},
+		{"test.pdf", 1000, false},
+		{"test", 1000, false},
+		{"", 1000, false},
+		{"audio.mp3.txt", 1000, false},
+		// Size validation
+		{"test.mp3", 0, false},
+		{"test.mp3", cfg.UploadMaxSize + 1, false},
 	}
 	
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
-			err := handler.validator.ValidateExtension(tt.filename)
+			header := &multipart.FileHeader{
+				Filename: tt.filename,
+				Size:     tt.size,
+			}
+			err := handler.validator.ValidateFile(header)
 			isValid := err == nil
 			if isValid != tt.valid {
-				t.Errorf("ValidateExtension(%q) valid = %v, want %v", tt.filename, isValid, tt.valid)
+				t.Errorf("ValidateFile(%q, %d) valid = %v, want %v", tt.filename, tt.size, isValid, tt.valid)
 			}
 		})
 	}

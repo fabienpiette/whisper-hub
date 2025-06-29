@@ -30,7 +30,7 @@ func NewVideoConverter() *VideoConverter {
 // ConvertVideoToAudio converts a video file to audio format
 func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath string) (string, error) {
 	if _, err := os.Stat(videoPath); os.IsNotExist(err) {
-		return "", errors.NewServiceError("video_not_found", "video file not found")
+		return "", errors.NewFileError("stat", videoPath, err)
 	}
 
 	// Create output path with .wav extension
@@ -47,12 +47,12 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 	if err := cmd.Run(); err != nil {
 		// Clean up failed conversion
 		os.Remove(audioPath)
-		return "", errors.NewServiceError("conversion_failed", constants.ErrVideoConversionFailed)
+		return "", errors.NewInternalServerError(constants.ErrVideoConversionFailed, err)
 	}
 
 	// Verify output file exists
 	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
-		return "", errors.NewServiceError("output_missing", "converted audio file not found")
+		return "", errors.NewFileError("stat", audioPath, err)
 	}
 
 	return audioPath, nil
