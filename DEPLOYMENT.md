@@ -2,7 +2,20 @@
 
 Perfect for self-hosting! Deploy with Docker in under 5 minutes.
 
-## 🚀 Quick Start (Docker Compose - Recommended)
+## 🚀 Quick Start Options
+
+### Option 1: Pre-built Image (Fastest ⚡)
+
+```bash
+# Run directly from Docker Hub
+docker run -d \
+  --name whisper-hub \
+  -p 8080:8080 \
+  -e OPENAI_API_KEY=sk-your-actual-api-key-here \
+  sighadd/whisper-hub:latest
+```
+
+### Option 2: Docker Compose (Full Setup)
 
 1. **Clone and deploy**:
 ```bash
@@ -69,18 +82,32 @@ location /transcribe/ {
 }
 ```
 
-## 🏗️ Manual Docker Build
+## 🏗️ Docker Image Options
 
+### Using Pre-built Image
 ```bash
-# Build image
-docker build -t audio-transcribe .
+# Pull latest image
+docker pull sighadd/whisper-hub:latest
 
 # Run container
 docker run -d \
-  --name audio-transcribe \
+  --name whisper-hub \
   -p 8080:8080 \
   -e OPENAI_API_KEY=sk-your-actual-api-key-here \
-  audio-transcribe
+  sighadd/whisper-hub:latest
+```
+
+### Manual Build (Development)
+```bash
+# Build image locally
+docker build -t whisper-hub:local .
+
+# Run container
+docker run -d \
+  --name whisper-hub \
+  -p 8080:8080 \
+  -e OPENAI_API_KEY=sk-your-actual-api-key-here \
+  whisper-hub:local
 ```
 
 ## 📊 Monitoring
@@ -97,7 +124,7 @@ curl http://localhost:8080/metrics
 
 ### Docker Stats
 ```bash
-docker stats audio-transcribe
+docker stats whisper-hub
 ```
 
 ### Structured Logs
@@ -153,7 +180,7 @@ docker-compose logs transcribe
 ### File upload fails
 Check file size limits and disk space:
 ```bash
-docker exec audio-transcribe df -h
+docker exec whisper-hub df -h
 ```
 
 ### API errors

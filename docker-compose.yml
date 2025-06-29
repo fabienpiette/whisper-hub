@@ -2,6 +2,9 @@ version: '3.8'
 
 services:
   whisper-hub:
+    # Option 1: Use pre-built image (uncomment next line and comment build line)
+    # image: sighadd/whisper-hub:latest
+    # Option 2: Build locally (default)
     build: .
     container_name: whisper-hub
     restart: unless-stopped

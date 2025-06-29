@@ -2,7 +2,7 @@
 
 Self-hosted web-based audio transcription using OpenAI's Whisper API. Perfect for /r/selfhosted!
 
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/r/sighadd/whisper-hub)
 [![Go](https://img.shields.io/badge/go-%2300ADD8.svg?style=flat&logo=go&logoColor=white)](https://golang.org/)
 [![HTMX](https://img.shields.io/badge/htmx-3366CC?style=flat&logo=htmx&logoColor=white)](https://htmx.org/)
 
@@ -30,6 +30,19 @@ Self-hosted web-based audio transcription using OpenAI's Whisper API. Perfect fo
 
 Perfect for self-hosting! Deploy in under 5 minutes:
 
+### Option 1: Pre-built Image (Fastest)
+```bash
+# Run directly from Docker Hub
+docker run -d \
+  --name whisper-hub \
+  -p 8080:8080 \
+  -e OPENAI_API_KEY=sk-your-actual-api-key-here \
+  sighadd/whisper-hub:latest
+
+# Access at http://localhost:8080
+```
+
+### Option 2: Docker Compose (Full Setup)
 ```bash
 # Clone the repo
 git clone <your-repo-url>
