@@ -6,6 +6,9 @@ const fileName = document.getElementById('file-name');
 const fileSize = document.getElementById('file-size');
 const submitBtn = document.getElementById('submit-btn');
 
+// Initialize button state
+submitBtn.disabled = true;
+
 // File size limits (in bytes)
 const FILE_LIMITS = {
     audio: 100 * 1024 * 1024, // 100MB
@@ -162,7 +165,9 @@ document.querySelector('form').addEventListener('htmx:beforeRequest', () => {
 
 document.querySelector('form').addEventListener('htmx:afterRequest', () => {
     stopProgressAnimation();
-    submitBtn.disabled = false;
+    // Only enable if a valid file is selected
+    const hasValidFile = fileInput.files.length > 0 && !uploadArea.classList.contains('invalid');
+    submitBtn.disabled = !hasValidFile;
     submitBtn.textContent = '🎯 Transcribe File';
     uploadArea.classList.remove('uploading', 'video', 'audio');
     submitBtn.classList.remove('video-processing', 'audio-processing');
