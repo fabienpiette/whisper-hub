@@ -9,17 +9,22 @@ Self-hosted web-based audio transcription using OpenAI's Whisper API. Perfect fo
 ## ✨ Features
 
 - 🚀 **One-command deployment** with Docker Compose
-- 🌐 **Clean web interface** with real-time progress
-- 📁 **Drag & drop file upload** 
-- 🔒 **Secure & privacy-focused** (files auto-deleted)
+- 🌐 **Clean web interface** with intelligent progress tracking
+- 📁 **Drag & drop file upload** with real-time validation
+- 🎬 **Advanced video conversion** with FFmpeg optimization
+- 🔒 **Secure & privacy-focused** (files auto-deleted, non-root container)
 - 📱 **Mobile-friendly** responsive design
+- 🚨 **Smart error handling** with actionable user guidance
 - 🏥 **Health checks** and monitoring ready
 - 💾 **Lightweight** (~50MB image, <200MB RAM)
+- ⚡ **Optimized for OpenAI limits** (automatic MP3 conversion)
 
 ## 🎯 Supported Formats
 
 **Audio:** MP3, WAV, M4A, OGG, FLAC, AAC (up to 100MB)  
 **Video:** MP4, AVI, MOV, MKV, WEBM, FLV, WMV, M4V (up to 2GB)
+
+> 📹 **Video Processing**: Videos are automatically converted to optimized MP3 format (16kHz mono, 64kbps) for efficient transcription while maintaining excellent speech quality.
 
 ## 🐳 Docker Deployment (Recommended)
 
@@ -55,14 +60,16 @@ go run cmd/server/main.go
 
 - OpenAI API key with Whisper access
 - Docker & Docker Compose (recommended)
-- OR Go 1.21+ for manual install
+- OR Go 1.21+ and FFmpeg for manual install
 
 ## 🔒 Privacy & Security
 
 - Files processed locally and immediately deleted
 - No data stored or logged
-- Runs as non-root user in container
+- Runs as non-root user in container with resource limits
 - API key managed via environment variables
+- Video files pre-validated before processing
+- Automatic cleanup of temporary conversion files
 
 ## 🏠 Perfect for Self-Hosting
 
@@ -79,6 +86,21 @@ Ideal for:
 - **RAM**: 50-200MB idle, 300-500MB during transcription
 - **Storage**: Minimal (temp files auto-deleted)
 
+## 🎬 Video Processing Features
+
+**Automatic Optimization:**
+- ✅ **Smart format detection** and validation
+- ✅ **Efficient MP3 conversion** (70% smaller than WAV)
+- ✅ **Pre-validation** for file integrity
+- ✅ **Size limit compliance** (OpenAI 25MB limit)
+- ✅ **Progress tracking** that matches actual processing steps
+
+**Technical Details:**
+- **Audio extraction**: 16kHz mono, 64kbps MP3
+- **Container support**: Includes FFmpeg with MP3 LAME encoder
+- **Error handling**: Detailed feedback for corruption, size, and format issues
+- **Performance**: ~0.5MB per minute of converted audio
+
 ## 🔧 Configuration
 
 | Variable | Default | Description |
@@ -89,6 +111,26 @@ Ideal for:
 
 ## 🆘 Troubleshooting
 
+### Common Issues
+
+**📁 "File format not supported"**
+- Check that your video/audio format is in the supported list
+- Try converting to MP4/MP3 before upload
+
+**⚠️ "Video file corrupted"**
+- File may be incomplete or damaged during recording
+- Re-record or try a different video file
+
+**💾 "File too large for OpenAI"**
+- Videos are automatically optimized, but very long files may still exceed 25MB
+- Try a shorter video or compress/trim the original
+
+**🔑 "API key invalid"**
+- Verify your OpenAI API key is correct and has Whisper access
+- Check that your API quota hasn't been exceeded
+
+### Debug Commands
+
 ```bash
 # Check logs
 docker-compose logs -f
@@ -97,7 +139,10 @@ docker-compose logs -f
 curl http://localhost:8080/health
 
 # Resource usage
-docker stats audio-transcribe
+docker stats whisper-hub
+
+# Test FFmpeg in container
+docker-compose exec whisper-hub ffmpeg -version
 ```
 
 ---
