@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"whisper-hub/internal/config"
+	"whisper-hub/internal/constants"
 )
 
 // mockTemplateService implements a mock template service for testing
@@ -188,8 +189,8 @@ func TestTranscribeHandler_ValidateFile(t *testing.T) {
 		{"audio.mp3.txt", 1000, false},
 		// Size validation
 		{"test.mp3", 0, false},
-		{"test.mp3", cfg.UploadMaxSize + 1, false},
-		{"test.mp4", cfg.UploadMaxSize + 1, true}, // Video files have higher limit
+		{"test.mp3", constants.MaxAudioFileSize + 1, false},
+		{"test.mp4", constants.MaxAudioFileSize + 1, true}, // Video files have higher limit
 	}
 	
 	for _, tt := range tests {

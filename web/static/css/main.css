@@ -349,19 +349,44 @@ body {
     word-wrap: break-word;
 }
 
-.copy-btn {
-    background: #28a745;
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.copy-btn, .download-btn {
     color: white;
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 0.9rem;
-    margin-top: 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 140px;
+}
+
+.copy-btn {
+    background: #28a745;
 }
 
 .copy-btn:hover {
     background: #218838;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.download-btn {
+    background: #17a2b8;
+}
+
+.download-btn:hover {
+    background: #138496;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
 }
 
 @media (max-width: 768px) {
@@ -385,5 +410,15 @@ body {
     
     .header h1 {
         font-size: 1.5rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .copy-btn, .download-btn {
+        min-width: unset;
+        flex: none;
     }
 }

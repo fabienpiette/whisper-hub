@@ -305,8 +305,9 @@ func TestIntegration_ContextTimeout(t *testing.T) {
 		t.Error("expected timeout error")
 	}
 	
-	// Check if it's a context timeout
-	if !strings.Contains(err.Error(), "context") && !strings.Contains(err.Error(), "timeout") {
+	// Check if it's a context timeout (accepts both old and new error messages)
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "context") && !strings.Contains(errMsg, "timeout") && !strings.Contains(errMsg, "timed out") {
 		t.Errorf("expected context/timeout error, got: %v", err)
 	}
 }

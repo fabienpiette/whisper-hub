@@ -58,13 +58,19 @@ func (w *Writer) WriteTranscriptionResult(rw http.ResponseWriter, transcription,
 		
 		<div class="transcript" id="transcript">%s</div>
 		
-		<button class="copy-btn" onclick="copyTranscript()">
-			📋 Copy Transcript
-		</button>
+		<div class="action-buttons">
+			<button class="copy-btn" onclick="copyTranscript()">
+				📋 Copy Transcript
+			</button>
+			<button class="download-btn" onclick="downloadTranscript('%s')">
+				💾 Download as TXT
+			</button>
+		</div>
 	</div>`, 
 		template.HTMLEscapeString(filename), 
 		len(transcription), 
 		template.HTMLEscapeString(transcription),
+		template.HTMLEscapeString(filename),
 	)
 }
 

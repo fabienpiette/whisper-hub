@@ -37,7 +37,7 @@ func TestLoad(t *testing.T) {
 			expected: &Config{
 				OpenAIAPIKey:  "",
 				Port:          "8080",
-				UploadMaxSize: 52428800, // 50MB
+				UploadMaxSize: 2147483648, // 2GB
 				TempDir:       os.TempDir(),
 			},
 			description: "should use default values when env vars are not set",

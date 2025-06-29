@@ -255,3 +255,41 @@ function copyTranscript() {
         document.body.removeChild(textArea);
     });
 }
+
+// Download transcript functionality
+function downloadTranscript(originalFilename) {
+    const transcript = document.getElementById('transcript').textContent;
+    
+    // Create a clean filename for the transcript
+    const baseName = originalFilename.replace(/\.[^/.]+$/, ""); // Remove extension
+    const cleanName = baseName.replace(/[^a-zA-Z0-9\-_]/g, '_'); // Replace special chars
+    const filename = `${cleanName}_transcript.txt`;
+    
+    // Create blob and download
+    const blob = new Blob([transcript], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    
+    // Create temporary download link
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = filename;
+    downloadLink.style.display = 'none';
+    
+    // Trigger download
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    
+    // Clean up
+    window.URL.revokeObjectURL(url);
+    
+    // Visual feedback
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.textContent = '✅ Downloaded!';
+    btn.style.background = '#28a745';
+    setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '#17a2b8';
+    }, 2000);
+}

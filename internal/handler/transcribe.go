@@ -33,7 +33,7 @@ func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateServi
 		transcriber:     service.NewTranscriber(cfg.OpenAIAPIKey),
 		videoConverter:  service.NewVideoConverterWithLogger(logger),
 		tempManager:     storage.NewTempFileManager(cfg.TempDir),
-		validator:       validation.NewFileValidator(cfg.UploadMaxSize),
+		validator:       validation.NewFileValidator(constants.MaxAudioFileSize),
 		responseWriter:  response.NewWriter(),
 		templateService: templateService,
 		config:          cfg,
