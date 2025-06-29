@@ -35,7 +35,7 @@ docker-compose up -d
 |----------|---------|-------------|
 | `OPENAI_API_KEY` | *required* | Your OpenAI API key |
 | `PORT` | `8080` | Server port |
-| `UPLOAD_MAX_SIZE` | `104857600` | Max file size (100MB) |
+| `UPLOAD_MAX_SIZE` | `2147483648` | Max upload size (2GB for videos) |
 
 ### Custom Port
 
@@ -65,7 +65,7 @@ location /transcribe/ {
     proxy_pass http://localhost:8080/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    client_max_body_size 100M;
+    client_max_body_size 2G;  # Support video files
 }
 ```
 
@@ -117,8 +117,10 @@ docker-compose logs transcribe | jq 'select(.msg=="transcription completed succe
 - ✅ Runs as non-root user (UID 1001)
 - ✅ No new privileges
 - ✅ Memory limits enforced
-- ✅ Temporary file cleanup
-- ✅ File type validation
+- ✅ Temporary file cleanup (including converted video files)
+- ✅ Audio/video file type validation with corruption detection
+- ✅ File size limits (100MB audio, 2GB video)
+- ✅ OpenAI API compliance (25MB converted audio limit)
 - ⚠️ API key in environment (consider Docker secrets for production)
 
 ## 🔄 Updates
