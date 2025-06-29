@@ -15,6 +15,7 @@ Self-hosted web-based audio transcription using OpenAI's Whisper API. Perfect fo
 - 🔒 **Secure & privacy-focused** (files auto-deleted, non-root container)
 - 📱 **Mobile-friendly** responsive design
 - 🚨 **Smart error handling** with actionable user guidance
+- 🌐 **Universal browser support** (Chrome, Firefox, Safari compatible)
 - 🏥 **Health checks** and monitoring ready
 - 💾 **Lightweight** (~50MB image, <200MB RAM)
 - ⚡ **Optimized for OpenAI limits** (automatic MP3 conversion)
@@ -141,6 +142,12 @@ Ideal for:
 **🔑 "API key invalid"**
 - Verify your OpenAI API key is correct and has Whisper access
 - Check that your API quota hasn't been exceeded
+
+**🦊 "Transcribe button stays disabled (Firefox only)"**
+- Firefox has stricter cross-origin policies than Chrome/Safari
+- This is automatically handled by CORS middleware
+- If issues persist, try accessing via `localhost` instead of IP address
+- Clear browser cache and reload the page
 
 ### Debug Commands
 

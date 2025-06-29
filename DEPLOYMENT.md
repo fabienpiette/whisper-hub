@@ -148,6 +148,7 @@ docker-compose logs transcribe | jq 'select(.msg=="transcription completed succe
 - ✅ Audio/video file type validation with corruption detection
 - ✅ File size limits (100MB audio, 2GB video)
 - ✅ OpenAI API compliance (25MB converted audio limit)
+- ✅ CORS middleware for browser cross-origin compatibility
 - ⚠️ API key in environment (consider Docker secrets for production)
 
 ## 🔄 Updates
@@ -185,6 +186,11 @@ docker exec whisper-hub df -h
 
 ### API errors
 Verify your OpenAI API key has credits and Whisper access.
+
+### Browser compatibility issues
+**Firefox:** Built-in CORS middleware handles cross-origin restrictions automatically.
+**If transcribe button stays disabled:** Clear browser cache and reload page.
+**Mixed content warnings:** Use HTTPS or access via localhost instead of IP address.
 
 ## 🎯 Perfect for:
 - Home labs
