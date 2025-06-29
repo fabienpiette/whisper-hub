@@ -159,7 +159,8 @@ document.querySelector('form').addEventListener('htmx:beforeRequest', () => {
         // Enhanced progress for video conversion
         startProgressAnimation('🔄 Converting & Transcribing...', timeEstimate);
     } else {
-        submitBtn.textContent = '🔄 Transcribing...';
+        // Simple progress for audio files
+        submitBtn.textContent = '📤 Uploading & transcribing...';
     }
 });
 
@@ -184,30 +185,33 @@ document.querySelector('form').addEventListener('htmx:responseError', () => {
     submitBtn.classList.remove('video-processing', 'audio-processing');
 });
 
-// Enhanced progress animation for video conversion
+// Enhanced progress animation matching backend flow
 let progressInterval;
 let progressStage = 0;
 
 function startProgressAnimation(baseText, estimateText) {
     const stages = [
-        '🔄 Preparing video...',
+        '📤 Uploading file...',
+        '🔍 Validating video...',
         '🎬 Converting to audio...',
-        '🎵 Optimizing audio...',
-        '🤖 Transcribing...'
+        '🤖 Transcribing audio...'
     ];
     
     progressStage = 0;
     submitBtn.textContent = stages[0];
     
     progressInterval = setInterval(() => {
-        progressStage = (progressStage + 1) % stages.length;
-        submitBtn.textContent = stages[progressStage];
-        
-        // Add estimated time on conversion stage
-        if (progressStage === 1 && estimateText) {
-            submitBtn.textContent += ` (${estimateText})`;
+        if (progressStage < stages.length - 1) {
+            progressStage++;
+            submitBtn.textContent = stages[progressStage];
+            
+            // Add estimated time on conversion stage (stage 2)
+            if (progressStage === 2 && estimateText) {
+                submitBtn.textContent += ` (${estimateText})`;
+            }
         }
-    }, 2000);
+        // Stay on final stage instead of cycling
+    }, 2500);
 }
 
 function stopProgressAnimation() {
