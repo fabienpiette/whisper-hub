@@ -15,6 +15,11 @@ import (
 	"whisper-hub/internal/errors"
 )
 
+const (
+	// OpenAI Whisper API file size limit (25MB)
+	MaxAudioFileSize = 25 * 1024 * 1024 // 26214400 bytes
+)
+
 // VideoConverter handles video to audio conversion using FFmpeg
 type VideoConverter struct {
 	ffmpegPath string
@@ -118,6 +123,11 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 	} else if stat.Size() == 0 {
 		os.Remove(audioPath)
 		return "", errors.NewInternalServerError("Conversion produced empty audio file", nil)
+	} else if stat.Size() > MaxAudioFileSize {
+		os.Remove(audioPath)
+		return "", errors.NewInternalServerError(
+			fmt.Sprintf("Converted audio file is too large (%d MB). OpenAI Whisper has a 25MB limit. Please use a shorter video or compress it further", 
+				stat.Size()/(1024*1024)), nil)
 	}
 
 	return audioPath, nil
@@ -171,7 +181,7 @@ func (c *VideoConverter) validateVideoFile(ctx context.Context, videoPath string
 func (c *VideoConverter) generateAudioPath(videoPath string) string {
 	dir := filepath.Dir(videoPath)
 	baseName := strings.TrimSuffix(filepath.Base(videoPath), filepath.Ext(videoPath))
-	return filepath.Join(dir, baseName+"_converted.wav")
+	return filepath.Join(dir, baseName+"_converted.mp3")
 }
 
 // buildFFmpegCommand constructs the FFmpeg command for video to audio conversion
@@ -181,10 +191,11 @@ func (c *VideoConverter) buildFFmpegCommand(ctx context.Context, inputPath, outp
 		"-loglevel", "error",      // Only show errors
 		"-i", inputPath,           // Input file
 		"-vn",                     // Disable video recording
-		"-acodec", "pcm_s16le",    // Audio codec: 16-bit PCM
+		"-acodec", "libmp3lame",   // Audio codec: MP3 LAME encoder
 		"-ar", "16000",            // Audio sample rate: 16kHz (optimal for Whisper)
 		"-ac", "1",                // Audio channels: mono
-		"-f", "wav",               // Output format: WAV
+		"-b:a", "64k",             // Audio bitrate: 64kbps (good quality, small size)
+		"-f", "mp3",               // Output format: MP3
 		"-avoid_negative_ts", "make_zero", // Handle timestamp issues
 		"-fflags", "+genpts",      // Generate presentation timestamps
 		"-max_muxing_queue_size", "1024", // Increase queue size for large files

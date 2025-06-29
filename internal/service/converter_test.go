@@ -55,10 +55,10 @@ func TestVideoConverter_generateAudioPath(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"/tmp/video.mp4", "/tmp/video_converted.wav"},
-		{"/path/to/movie.avi", "/path/to/movie_converted.wav"},
-		{"video.mkv", "video_converted.wav"},
-		{"/tmp/file.with.dots.mp4", "/tmp/file.with.dots_converted.wav"},
+		{"/tmp/video.mp4", "/tmp/video_converted.mp3"},
+		{"/path/to/movie.avi", "/path/to/movie_converted.mp3"},
+		{"video.mkv", "video_converted.mp3"},
+		{"/tmp/file.with.dots.mp4", "/tmp/file.with.dots_converted.mp3"},
 	}
 	
 	for _, tt := range tests {
@@ -128,7 +128,7 @@ func TestVideoConverter_buildFFmpegCommand(t *testing.T) {
 	args := cmd.Args
 	
 	// Check for essential arguments
-	essentialArgs := []string{"-i", inputPath, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-f", "wav", "-y", outputPath}
+	essentialArgs := []string{"-i", inputPath, "-vn", "-acodec", "libmp3lame", "-ar", "16000", "-ac", "1", "-b:a", "64k", "-f", "mp3", "-y", outputPath}
 	
 	for i, expectedArg := range essentialArgs {
 		if i+1 >= len(args) || args[i+1] != expectedArg {
