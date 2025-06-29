@@ -52,6 +52,7 @@ func main() {
 	r := mux.NewRouter()
 	
 	// Add middleware
+	r.Use(middleware.CORS())
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.RequestLogger(logger))
 	r.Use(metrics.RequestMetrics())
