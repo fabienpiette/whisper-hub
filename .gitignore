@@ -33,4 +33,5 @@ temp/
 
 # Claude Code project files
 CLAUDE.md
-.claude/
+.claude/node_modules/
+package-lock.json
