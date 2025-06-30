@@ -1,6 +1,6 @@
 # 🎵 Whisper Hub
 
-Self-hosted web-based audio transcription using OpenAI's Whisper API. Perfect for /r/selfhosted!
+Privacy-first self-hosted web-based audio transcription using OpenAI's Whisper API. Enterprise-grade security with modern UX. Perfect for /r/selfhosted!
 
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/r/sighadd/whisper-hub)
 [![Go](https://img.shields.io/badge/go-%2300ADD8.svg?style=flat&logo=go&logoColor=white)](https://golang.org/)
@@ -8,17 +8,40 @@ Self-hosted web-based audio transcription using OpenAI's Whisper API. Perfect fo
 
 ## ✨ Features
 
-- 🚀 **One-command deployment** with Docker Compose
-- 🌐 **Clean web interface** with intelligent progress tracking
-- 📁 **Drag & drop file upload** with real-time validation
-- 🎬 **Advanced video conversion** with FFmpeg optimization
-- 🔒 **Secure & privacy-focused** (files auto-deleted, non-root container)
-- 📱 **Mobile-friendly** responsive design
-- 🚨 **Smart error handling** with actionable user guidance
-- 🌐 **Universal browser support** (Chrome, Firefox, Safari compatible)
-- 🏥 **Health checks** and monitoring ready
-- 💾 **Lightweight** (~50MB image, <200MB RAM)
-- ⚡ **Optimized for OpenAI limits** (automatic MP3 conversion)
+**🚀 Deployment & Infrastructure:**
+- **One-command deployment** with Docker Compose
+- **Lightweight** (~50MB image, <200MB RAM)
+- **Health checks** and monitoring ready
+- **Universal browser support** (Chrome, Firefox, Safari compatible)
+
+**🎨 Modern User Experience:**
+- **Clean web interface** with intelligent progress tracking
+- **Mobile-first responsive design** with modern CSS Grid/Flexbox
+- **Drag & drop file upload** with real-time validation
+- **Privacy-first history management** with search and export
+- **Incognito mode** for sensitive transcriptions
+- **Keyboard shortcuts** for power users (Ctrl+H, Escape)
+- **Toast notifications** with real-time feedback
+
+**🔒 Enterprise-Grade Security:**
+- **CSRF protection** with secure token validation
+- **XSS prevention** through comprehensive input sanitization
+- **Content Security Policy** with strict script controls
+- **AES-GCM encryption** for client-side data storage
+- **Rate limiting** and DDoS protection
+- **GDPR/CCPA compliance** with data portability
+
+**🎬 Advanced Media Processing:**
+- **Advanced video conversion** with FFmpeg optimization
+- **Smart error handling** with actionable user guidance
+- **Optimized for OpenAI limits** (automatic MP3 conversion)
+- **File validation** with corruption detection
+
+**📊 Privacy & Data Management:**
+- **Zero server-side storage** - your data stays on your device
+- **Encrypted history** with search, filter, and export
+- **Data portability** (JSON, CSV, TXT export)
+- **Automatic cleanup** and privacy controls
 
 ## 🎯 Supported Formats
 
@@ -78,21 +101,37 @@ go run cmd/server/main.go
 
 ## 🔒 Privacy & Security
 
-- Files processed locally and immediately deleted
-- No data stored or logged
-- Runs as non-root user in container with resource limits
-- API key managed via environment variables
-- Video files pre-validated before processing
-- Automatic cleanup of temporary conversion files
+**Privacy-First Design:**
+- **Zero server-side storage** - transcriptions never saved to server
+- **Client-side encryption** - history encrypted with AES-GCM before localStorage
+- **Incognito mode** - option for zero data persistence
+- **GDPR/CCPA compliance** - full data portability and user control
+
+**Enterprise Security:**
+- **CSRF protection** - secure token validation on all forms
+- **XSS prevention** - comprehensive input sanitization
+- **Content Security Policy** - strict script execution controls
+- **Rate limiting** - protection against abuse and DDoS
+- **Input validation** - whitelist-based security validation
+- **Secure file handling** - path traversal and injection prevention
+
+**Infrastructure Security:**
+- **Non-root container** execution with resource limits
+- **Automatic file cleanup** - temporary files immediately deleted
+- **API key protection** - environment variable management
+- **Security headers** - comprehensive HTTP security headers
+- **Video validation** - pre-processing integrity checks
 
 ## 🏠 Perfect for Self-Hosting
 
 Ideal for:
-- Home labs and personal use
-- Small team transcription needs  
-- Privacy-conscious users
-- Local AI workflows
-- Homelab enthusiasts
+- **Home labs** and personal use
+- **Small team** transcription needs  
+- **Privacy-conscious** users requiring zero cloud storage
+- **Local AI workflows** and automation
+- **Homelab enthusiasts** wanting enterprise-grade security
+- **GDPR-compliant** organizations needing data sovereignty
+- **Security-focused** environments requiring comprehensive protection
 
 ## 📊 Resource Usage
 
