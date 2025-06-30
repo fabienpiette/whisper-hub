@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"whisper-hub/internal/config"
 	"whisper-hub/internal/constants"
@@ -50,16 +51,23 @@ func main() {
 	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService, metrics)
 	historyHandler := handler.NewHistoryAssetsHandler(cfg)
 
+	// Initialize security middleware
+	security := middleware.NewSecurityMiddleware()
+	globalRateLimit := middleware.NewRateLimiter(100, 1*time.Minute) // 100 requests per minute
+
 	r := mux.NewRouter()
 	
-	// Add middleware
+	// Add security middleware
+	r.Use(security.SecurityHeaders)
+	r.Use(globalRateLimit.RateLimit)
 	r.Use(middleware.CORS())
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.RequestLogger(logger))
 	r.Use(metrics.RequestMetrics())
 	
-	// Apply rate limiting only to transcribe endpoint
+	// Apply CSRF protection and rate limiting to transcribe endpoint
 	transcribeRouter := r.PathPrefix("/transcribe").Subrouter()
+	transcribeRouter.Use(security.CSRFProtection)
 	transcribeRouter.Use(rateLimiter.RateLimit())
 	transcribeRouter.HandleFunc("", transcribeHandler.HandleTranscribe).Methods("POST")
 	
@@ -74,6 +82,7 @@ func main() {
 
 	// Public routes
 	r.HandleFunc("/", transcribeHandler.HandleIndex).Methods("GET")
+	r.HandleFunc("/api/csrf-token", transcribeHandler.HandleCSRFToken).Methods("GET")
 	r.HandleFunc("/health", transcribeHandler.HandleHealth).Methods("GET")
 	r.HandleFunc("/metrics", transcribeHandler.HandleMetrics(metrics)).Methods("GET")
 

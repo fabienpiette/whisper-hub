@@ -330,12 +330,17 @@ class HistoryExport {
      * Download file to user's device
      */
     downloadFile(content, filename, mimeType) {
+        // Sanitize filename for security
+        const safeFilename = window.SecurityUtils ? 
+            SecurityUtils.sanitizeFilename(filename) : 
+            filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+        
         const blob = new Blob([content], { type: mimeType });
         const url = window.URL.createObjectURL(blob);
         
         const downloadLink = document.createElement('a');
         downloadLink.href = url;
-        downloadLink.download = filename;
+        downloadLink.download = safeFilename;
         downloadLink.style.display = 'none';
         
         document.body.appendChild(downloadLink);

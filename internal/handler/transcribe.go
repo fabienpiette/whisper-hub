@@ -11,6 +11,7 @@ import (
 	"whisper-hub/internal/constants"
 	"whisper-hub/internal/errors"
 	"whisper-hub/internal/interfaces"
+	"whisper-hub/internal/middleware"
 	"whisper-hub/internal/response"
 	"whisper-hub/internal/service"
 	"whisper-hub/internal/storage"
@@ -29,6 +30,7 @@ type TranscribeHandler struct {
 	config          *config.Config
 	logger          *slog.Logger
 	metrics         interfaces.MetricsTracker
+	security        *middleware.SecurityMiddleware
 }
 
 func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateService interfaces.TemplateService, metrics interfaces.MetricsTracker) *TranscribeHandler {
@@ -42,14 +44,30 @@ func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateServi
 		config:          cfg,
 		logger:          logger,
 		metrics:         metrics,
+		security:        middleware.NewSecurityMiddleware(),
 	}
 }
 
 func (h *TranscribeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
-	if err := h.templateService.RenderIndex(w, nil); err != nil {
+	data := map[string]interface{}{
+		"CSRFToken": h.security.GetCSRFToken(r),
+	}
+	
+	if err := h.templateService.RenderIndex(w, data); err != nil {
 		h.logger.Error("failed to render index template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
+}
+
+// HandleCSRFToken provides CSRF tokens for AJAX requests
+func (h *TranscribeHandler) HandleCSRFToken(w http.ResponseWriter, r *http.Request) {
+	token := h.security.GetCSRFToken(r)
+	
+	response := map[string]interface{}{
+		"csrf_token": token,
+	}
+	
+	h.responseWriter.WriteJSON(w, http.StatusOK, response)
 }
 
 func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Request) {

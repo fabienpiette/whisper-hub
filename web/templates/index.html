@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whisper Hub - Audio Transcription</title>
     <link rel="stylesheet" href="/static/css/app.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10" 
+            integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" 
+            crossorigin="anonymous"></script>
     <meta name="description" content="Privacy-first audio and video transcription service">
 </head>
 <body class="app-container">
@@ -51,6 +53,7 @@
 
                 <!-- File Upload -->
                 <form id="transcribe-form" hx-post="/transcribe" hx-target="#result-container" hx-encoding="multipart/form-data">
+                    <input type="hidden" name="csrf_token" id="csrf-token" value="{{.CSRFToken}}">`
                     <div class="upload-zone" id="upload-zone">
                         <div class="upload-content">
                             <div class="upload-icon">📎</div>
@@ -188,6 +191,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Scripts -->
+    <script src="/static/js/security.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

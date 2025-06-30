@@ -676,6 +676,10 @@ class HistoryUI {
      * Utility: Escape HTML
      */
     escapeHtml(text) {
+        if (window.SecurityUtils) {
+            return SecurityUtils.sanitizeHTML(text);
+        }
+        // Fallback implementation
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
@@ -686,8 +690,12 @@ class HistoryUI {
      */
     generateTranscriptFilename(originalFilename) {
         const baseName = originalFilename.replace(/\.[^/.]+$/, "");
-        const cleanName = baseName.replace(/[^a-zA-Z0-9\-_]/g, '_');
-        return `${cleanName}_transcript.txt`;
+        const filename = `${baseName}_transcript.txt`;
+        
+        // Use SecurityUtils if available, otherwise fallback
+        return window.SecurityUtils ? 
+            SecurityUtils.sanitizeFilename(filename) : 
+            filename.replace(/[^a-zA-Z0-9\-_.]/g, '_');
     }
 
     /**

@@ -103,6 +103,14 @@ class WhisperApp {
         // Listen for HTMX events
         document.addEventListener('htmx:beforeRequest', (e) => {
             this.ui.showLoading();
+            
+            // Check rate limit before sending request
+            if (!SecurityUtils.checkRateLimit('transcription', 5, 60000)) {
+                e.preventDefault();
+                this.ui.showToast('Rate limit exceeded. Please wait before trying again.', 'warning');
+                this.ui.hideLoading();
+                return;
+            }
         });
         
         document.addEventListener('htmx:afterRequest', (e) => {
@@ -110,10 +118,25 @@ class WhisperApp {
             
             if (e.detail.successful) {
                 this.handleTranscriptionSuccess(e);
+                // Refresh CSRF token after successful request
+                this.refreshCSRFToken();
             } else {
                 this.handleTranscriptionError(e);
             }
         });
+    }
+    
+    async refreshCSRFToken() {
+        try {
+            const response = await fetch('/api/csrf-token');
+            const data = await response.json();
+            const csrfInput = document.getElementById('csrf-token');
+            if (csrfInput && data.csrf_token) {
+                csrfInput.value = data.csrf_token;
+            }
+        } catch (error) {
+            console.warn('Failed to refresh CSRF token:', error);
+        }
     }
     
     async handleTranscriptionSuccess(event) {
@@ -232,7 +255,16 @@ class WhisperApp {
         container.style.display = 'block';
         emptyState.style.display = 'none';
         
-        container.innerHTML = entries.map(entry => this.createHistoryItem(entry)).join('');
+        // Clear container safely
+        while (container.firstChild) {
+            container.removeChild(container.firstChild);
+        }
+        
+        // Create and append history items securely
+        entries.forEach(entry => {
+            const itemElement = this.createHistoryItem(entry);
+            container.appendChild(itemElement);
+        });
         
         // Add event listeners to history items
         this.attachHistoryItemListeners();
@@ -247,45 +279,101 @@ class WhisperApp {
         const typeIcon = entry.fileType === 'video' ? '🎬' : '🎵';
         const starIcon = entry.starred ? '⭐' : '☆';
         
-        return `
-            <div class="history-item" data-id="${entry.id}">
-                <div class="item-header">
-                    <div class="item-info">
-                        <h4 class="item-title">
-                            <span class="type-icon">${typeIcon}</span>
-                            ${this.escapeHtml(entry.filename)}
-                        </h4>
-                        <div class="item-meta">
-                            <span class="timestamp">${relativeTime}</span>
-                            <span class="file-size">${fileSize}</span>
-                            ${duration ? `<span class="duration">${duration}</span>` : ''}
-                        </div>
-                    </div>
-                    <div class="item-actions">
-                        <button class="action-btn star-btn" data-action="star" title="Star">
-                            ${starIcon}
-                        </button>
-                        <button class="action-btn copy-btn" data-action="copy" title="Copy">
-                            📋
-                        </button>
-                        <button class="action-btn download-btn" data-action="download" title="Download">
-                            💾
-                        </button>
-                        <button class="action-btn delete-btn" data-action="delete" title="Delete">
-                            🗑️
-                        </button>
-                    </div>
-                </div>
-                <div class="item-preview">
-                    <p class="preview-text">${this.escapeHtml(preview)}</p>
-                    <button class="expand-btn" data-action="expand">Show full transcript</button>
-                </div>
-                <div class="item-full hidden">
-                    <div class="full-text">${this.escapeHtml(entry.transcript)}</div>
-                    <button class="collapse-btn" data-action="collapse">Show less</button>
-                </div>
-            </div>
-        `;
+        // Create DOM elements safely instead of innerHTML
+        const itemDiv = SecurityUtils.createElement('div', {
+            'class': 'history-item',
+            'data-id': SecurityUtils.sanitizeAttribute(entry.id)
+        });
+        
+        const headerDiv = SecurityUtils.createElement('div', { 'class': 'item-header' });
+        
+        // Item info section
+        const infoDiv = SecurityUtils.createElement('div', { 'class': 'item-info' });
+        const titleH4 = SecurityUtils.createElement('h4', { 'class': 'item-title' });
+        const typeIconSpan = SecurityUtils.createElement('span', { 'class': 'type-icon' }, typeIcon);
+        const filenameText = document.createTextNode(entry.filename);
+        
+        titleH4.appendChild(typeIconSpan);
+        titleH4.appendChild(filenameText);
+        
+        const metaDiv = SecurityUtils.createElement('div', { 'class': 'item-meta' });
+        const timestampSpan = SecurityUtils.createElement('span', { 'class': 'timestamp' }, relativeTime);
+        const sizeSpan = SecurityUtils.createElement('span', { 'class': 'file-size' }, fileSize);
+        
+        metaDiv.appendChild(timestampSpan);
+        metaDiv.appendChild(sizeSpan);
+        
+        if (duration) {
+            const durationSpan = SecurityUtils.createElement('span', { 'class': 'duration' }, duration);
+            metaDiv.appendChild(durationSpan);
+        }
+        
+        infoDiv.appendChild(titleH4);
+        infoDiv.appendChild(metaDiv);
+        
+        // Action buttons section
+        const actionsDiv = SecurityUtils.createElement('div', { 'class': 'item-actions' });
+        
+        const starBtn = SecurityUtils.createElement('button', {
+            'class': 'action-btn star-btn',
+            'data-action': 'star',
+            'title': 'Star'
+        }, starIcon);
+        
+        const copyBtn = SecurityUtils.createElement('button', {
+            'class': 'action-btn copy-btn',
+            'data-action': 'copy',
+            'title': 'Copy'
+        }, '📋');
+        
+        const downloadBtn = SecurityUtils.createElement('button', {
+            'class': 'action-btn download-btn',
+            'data-action': 'download',
+            'title': 'Download'
+        }, '💾');
+        
+        const deleteBtn = SecurityUtils.createElement('button', {
+            'class': 'action-btn delete-btn',
+            'data-action': 'delete',
+            'title': 'Delete'
+        }, '🗑️');
+        
+        actionsDiv.appendChild(starBtn);
+        actionsDiv.appendChild(copyBtn);
+        actionsDiv.appendChild(downloadBtn);
+        actionsDiv.appendChild(deleteBtn);
+        
+        headerDiv.appendChild(infoDiv);
+        headerDiv.appendChild(actionsDiv);
+        
+        // Preview section
+        const previewDiv = SecurityUtils.createElement('div', { 'class': 'item-preview' });
+        const previewP = SecurityUtils.createElement('p', { 'class': 'preview-text' }, preview);
+        const expandBtn = SecurityUtils.createElement('button', {
+            'class': 'expand-btn',
+            'data-action': 'expand'
+        }, 'Show full transcript');
+        
+        previewDiv.appendChild(previewP);
+        previewDiv.appendChild(expandBtn);
+        
+        // Full transcript section
+        const fullDiv = SecurityUtils.createElement('div', { 'class': 'item-full hidden' });
+        const fullTextDiv = SecurityUtils.createElement('div', { 'class': 'full-text' }, entry.transcript);
+        const collapseBtn = SecurityUtils.createElement('button', {
+            'class': 'collapse-btn',
+            'data-action': 'collapse'
+        }, 'Show less');
+        
+        fullDiv.appendChild(fullTextDiv);
+        fullDiv.appendChild(collapseBtn);
+        
+        // Assemble the complete item
+        itemDiv.appendChild(headerDiv);
+        itemDiv.appendChild(previewDiv);
+        itemDiv.appendChild(fullDiv);
+        
+        return itemDiv;
     }
     
     attachHistoryItemListeners() {
@@ -578,11 +666,14 @@ class WhisperApp {
     }
     
     downloadFile(content, filename, mimeType) {
+        // Sanitize filename for security
+        const safeFilename = SecurityUtils.sanitizeFilename(filename);
+        
         const blob = new Blob([content], { type: mimeType });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = filename;
+        a.download = safeFilename;
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
@@ -595,17 +686,42 @@ class WhisperApp {
 class HistoryStorage {
     constructor() {
         this.storageKey = 'whisper-history';
+        this.encryptionKey = this.getOrCreateEncryptionKey();
+    }
+    
+    getOrCreateEncryptionKey() {
+        const keyName = 'whisper-encryption-key';
+        let key = localStorage.getItem(keyName);
+        
+        if (!key) {
+            // Generate a new encryption key
+            key = SecurityUtils.generateCSRFToken();
+            localStorage.setItem(keyName, key);
+        }
+        
+        return key;
     }
     
     async save(entry) {
         const entries = await this.load();
         entries.unshift(entry);
-        localStorage.setItem(this.storageKey, JSON.stringify(entries));
+        const encryptedData = await SecurityUtils.encryptData(JSON.stringify(entries), this.encryptionKey);
+        localStorage.setItem(this.storageKey, encryptedData);
     }
     
     async load(filters = {}) {
         const stored = localStorage.getItem(this.storageKey);
-        let entries = stored ? JSON.parse(stored) : [];
+        let entries = [];
+        
+        if (stored) {
+            try {
+                const decryptedData = await SecurityUtils.decryptData(stored, this.encryptionKey);
+                entries = JSON.parse(decryptedData);
+            } catch (error) {
+                console.warn('Failed to decrypt history data, using unencrypted fallback');
+                entries = JSON.parse(stored);
+            }
+        }
         
         // Apply filters
         if (filters.search) {
@@ -630,7 +746,8 @@ class HistoryStorage {
     async delete(id) {
         const entries = await this.load();
         const filtered = entries.filter(entry => entry.id !== id);
-        localStorage.setItem(this.storageKey, JSON.stringify(filtered));
+        const encryptedData = await SecurityUtils.encryptData(JSON.stringify(filtered), this.encryptionKey);
+        localStorage.setItem(this.storageKey, encryptedData);
     }
     
     async clear() {
@@ -642,7 +759,8 @@ class HistoryStorage {
         const entry = entries.find(e => e.id === id);
         if (entry) {
             entry.starred = !entry.starred;
-            localStorage.setItem(this.storageKey, JSON.stringify(entries));
+            const encryptedData = await SecurityUtils.encryptData(JSON.stringify(entries), this.encryptionKey);
+            localStorage.setItem(this.storageKey, encryptedData);
         }
     }
     
@@ -852,15 +970,19 @@ class HistoryExporter {
     
     generateFilename(format) {
         const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-        return `whisper-hub-history-${timestamp}.${format}`;
+        const filename = `whisper-hub-history-${timestamp}.${format}`;
+        return SecurityUtils.sanitizeFilename(filename);
     }
     
     downloadFile(content, filename, mimeType) {
+        // Sanitize filename for security
+        const safeFilename = SecurityUtils.sanitizeFilename(filename);
+        
         const blob = new Blob([content], { type: mimeType });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = filename;
+        a.download = safeFilename;
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
