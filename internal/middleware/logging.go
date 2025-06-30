@@ -6,32 +6,13 @@ import (
 	"time"
 )
 
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-	size       int
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
-
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	size, err := rw.ResponseWriter.Write(b)
-	rw.size += size
-	return size, err
-}
 
 func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			
-			rw := &responseWriter{
-				ResponseWriter: w,
-				statusCode:     http.StatusOK,
-			}
+			rw := NewResponseWriter(w)
 
 			// Add request ID for tracing
 			requestID := r.Header.Get("X-Request-ID")
@@ -59,9 +40,9 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			// Log request completion
 			duration := time.Since(start)
 			reqLogger.Info("request completed",
-				"status_code", rw.statusCode,
+				"status_code", rw.StatusCode(),
 				"duration_ms", duration.Milliseconds(),
-				"response_size", rw.size,
+				"response_size", rw.Size(),
 			)
 		})
 	}

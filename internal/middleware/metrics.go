@@ -71,10 +71,7 @@ func (m *Metrics) RequestMetrics() func(http.Handler) http.Handler {
 			m.RequestsActive++
 			m.mu.Unlock()
 
-			rw := &responseWriter{
-				ResponseWriter: w,
-				statusCode:     http.StatusOK,
-			}
+			rw := NewResponseWriter(w)
 
 			next.ServeHTTP(rw, r)
 
@@ -90,8 +87,8 @@ func (m *Metrics) RequestMetrics() func(http.Handler) http.Handler {
 			m.ResponseTimes[path] = append(m.ResponseTimes[path], duration)
 
 			// Track errors (4xx, 5xx)
-			if rw.statusCode >= 400 {
-				key := path + "_" + strconv.Itoa(rw.statusCode)
+			if rw.StatusCode() >= 400 {
+				key := path + "_" + strconv.Itoa(rw.StatusCode())
 				m.Errors[key]++
 			}
 			m.mu.Unlock()
