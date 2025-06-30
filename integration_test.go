@@ -30,6 +30,13 @@ func (m *mockTemplateService) RenderIndex(w http.ResponseWriter, data interface{
 	return nil
 }
 
+// mockMetricsTracker implements a mock metrics tracker for testing
+type mockMetricsTracker struct{}
+
+func (m *mockMetricsTracker) TrackHistoryFeatureUsage(action string) {
+	// Mock implementation - do nothing
+}
+
 func TestIntegration_FullWorkflow(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -47,7 +54,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 	
 	// Create a mock template service for testing
 	templateService := &mockTemplateService{}
-	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService)
+	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	// Setup router like main.go
 	r := mux.NewRouter()
@@ -174,7 +181,7 @@ func TestIntegration_Middleware(t *testing.T) {
 	
 	// Create a mock template service for testing
 	templateService := &mockTemplateService{}
-	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService)
+	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	// Setup router with middleware
 	r := mux.NewRouter()
@@ -232,7 +239,7 @@ func TestIntegration_RateLimit(t *testing.T) {
 	
 	// Create a mock template service for testing
 	templateService := &mockTemplateService{}
-	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService)
+	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	// Setup router with rate limiting
 	r := mux.NewRouter()

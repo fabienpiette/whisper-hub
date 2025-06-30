@@ -15,6 +15,8 @@ import (
 	"whisper-hub/internal/service"
 	"whisper-hub/internal/storage"
 	"whisper-hub/internal/validation"
+
+	"github.com/google/uuid"
 )
 
 type TranscribeHandler struct {
@@ -26,9 +28,10 @@ type TranscribeHandler struct {
 	templateService interfaces.TemplateService
 	config          *config.Config
 	logger          *slog.Logger
+	metrics         interfaces.MetricsTracker
 }
 
-func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateService interfaces.TemplateService) *TranscribeHandler {
+func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateService interfaces.TemplateService, metrics interfaces.MetricsTracker) *TranscribeHandler {
 	return &TranscribeHandler{
 		transcriber:     service.NewTranscriber(cfg.OpenAIAPIKey),
 		videoConverter:  service.NewVideoConverterWithLogger(logger),
@@ -38,6 +41,7 @@ func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateServi
 		templateService: templateService,
 		config:          cfg,
 		logger:          logger,
+		metrics:         metrics,
 	}
 }
 
@@ -70,13 +74,25 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 	)
 
 	// Save and process file
-	transcription, err := h.processTranscription(file, header)
+	transcription, processingTime, err := h.processTranscription(file, header)
 	if err != nil {
 		h.responseWriter.WriteError(w, err)
 		return
 	}
 
-	h.responseWriter.WriteTranscriptionResult(w, transcription, header.Filename)
+	// Create history metadata for client-side storage
+	if h.config.HistoryEnabled {
+		metadata := &response.HistoryMetadata{
+			ID:        uuid.New().String(),
+			Timestamp: time.Now().UTC(),
+			FileType:  h.getFileType(header.Filename),
+			FileSize:  header.Size,
+			Duration:  h.calculateDuration(processingTime, len(transcription)),
+		}
+		h.responseWriter.WriteTranscriptionResultWithMetadata(w, transcription, header.Filename, metadata)
+	} else {
+		h.responseWriter.WriteTranscriptionResult(w, transcription, header.Filename)
+	}
 }
 
 // parseAndValidateForm handles form parsing and validation
@@ -107,11 +123,11 @@ func (h *TranscribeHandler) parseAndValidateForm(r *http.Request) (file multipar
 }
 
 // processTranscription handles file saving, conversion (if needed), and transcription
-func (h *TranscribeHandler) processTranscription(file multipart.File, header *multipart.FileHeader) (string, error) {
+func (h *TranscribeHandler) processTranscription(file multipart.File, header *multipart.FileHeader) (string, time.Duration, error) {
 	filePath, err := h.tempManager.SaveUploadedFile(file, header)
 	if err != nil {
 		h.logger.Error("failed to save uploaded file", "error", err, "filename", header.Filename)
-		return "", &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrSaveFileFailed, Err: err}
+		return "", 0, &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrSaveFileFailed, Err: err}
 	}
 	defer h.tempManager.Cleanup(filePath)
 
@@ -128,7 +144,7 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 		convertedPath, err := h.videoConverter.ConvertVideoToAudio(ctx, filePath)
 		if err != nil {
 			h.logger.Error("video conversion failed", "error", err, "filename", header.Filename)
-			return "", &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrVideoConversionFailed, Err: err}
+			return "", 0, &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrVideoConversionFailed, Err: err}
 		}
 		
 		audioFilePath = convertedPath
@@ -151,7 +167,7 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 			"filename", header.Filename,
 			"duration_ms", duration.Milliseconds(),
 		)
-		return "", &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrTranscribeFailed, Err: err}
+		return "", duration, &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrTranscribeFailed, Err: err}
 	}
 
 	h.logger.Info("transcription completed successfully", 
@@ -161,7 +177,27 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 		"was_video", h.validator.IsVideoFile(header.Filename),
 	)
 
-	return transcription, nil
+	return transcription, duration, nil
+}
+
+// getFileType determines if the file is audio or video
+func (h *TranscribeHandler) getFileType(filename string) string {
+	if h.validator.IsVideoFile(filename) {
+		return "video"
+	}
+	return "audio"
+}
+
+// calculateDuration provides an estimated duration based on processing time
+// This is a rough estimate since we don't have actual audio duration
+func (h *TranscribeHandler) calculateDuration(processingTime time.Duration, transcriptLength int) *float64 {
+	// Rough estimation: ~150 words per minute, ~5 chars per word
+	if transcriptLength > 0 {
+		estimatedMinutes := float64(transcriptLength) / (150 * 5)
+		estimatedSeconds := estimatedMinutes * 60
+		return &estimatedSeconds
+	}
+	return nil
 }
 
 

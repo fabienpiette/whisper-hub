@@ -8,18 +8,21 @@ import (
 )
 
 type Metrics struct {
-	mu             sync.RWMutex
-	RequestsTotal  map[string]int64
-	RequestsActive int64
-	ResponseTimes  map[string][]time.Duration
-	Errors         map[string]int64
+	mu               sync.RWMutex
+	RequestsTotal    map[string]int64
+	RequestsActive   int64
+	ResponseTimes    map[string][]time.Duration
+	Errors           map[string]int64
+	// Privacy-safe history metrics (no content)
+	HistoryFeature   map[string]int64 // enabled, disabled, cleared, exported
 }
 
 func NewMetrics() *Metrics {
 	return &Metrics{
-		RequestsTotal: make(map[string]int64),
-		ResponseTimes: make(map[string][]time.Duration),
-		Errors:        make(map[string]int64),
+		RequestsTotal:  make(map[string]int64),
+		ResponseTimes:  make(map[string][]time.Duration),
+		Errors:         make(map[string]int64),
+		HistoryFeature: make(map[string]int64),
 	}
 }
 
@@ -28,9 +31,10 @@ func (m *Metrics) GetStats() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"requests_total":  m.RequestsTotal,
-		"requests_active": m.RequestsActive,
-		"errors_total":    m.Errors,
+		"requests_total":    m.RequestsTotal,
+		"requests_active":   m.RequestsActive,
+		"errors_total":      m.Errors,
+		"history_feature":   m.HistoryFeature,
 	}
 
 	// Calculate average response times
@@ -47,6 +51,13 @@ func (m *Metrics) GetStats() map[string]interface{} {
 	stats["avg_response_time_ms"] = avgTimes
 
 	return stats
+}
+
+// TrackHistoryFeatureUsage tracks privacy-safe history feature usage
+func (m *Metrics) TrackHistoryFeatureUsage(action string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.HistoryFeature[action]++
 }
 
 func (m *Metrics) RequestMetrics() func(http.Handler) http.Handler {

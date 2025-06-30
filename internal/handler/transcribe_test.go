@@ -24,6 +24,13 @@ func (m *mockTemplateService) RenderIndex(w http.ResponseWriter, data interface{
 	return nil
 }
 
+// mockMetricsTracker implements a mock metrics tracker for testing
+type mockMetricsTracker struct{}
+
+func (m *mockMetricsTracker) TrackHistoryFeatureUsage(action string) {
+	// Mock implementation - do nothing
+}
+
 func TestNewTranscribeHandler(t *testing.T) {
 	cfg := &config.Config{
 		OpenAIAPIKey:  "test-key",
@@ -35,8 +42,9 @@ func TestNewTranscribeHandler(t *testing.T) {
 	
 	// Create a mock template service for testing
 	templateService := &mockTemplateService{}
+	metrics := &mockMetricsTracker{}
 	
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, metrics)
 	
 	if handler == nil {
 		t.Error("NewTranscribeHandler returned nil")
@@ -59,7 +67,7 @@ func TestTranscribeHandler_HandleIndex(t *testing.T) {
 	cfg := &config.Config{OpenAIAPIKey: "test-key"}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
@@ -83,7 +91,7 @@ func TestTranscribeHandler_HandleTranscribe_MethodNotAllowed(t *testing.T) {
 	cfg := &config.Config{OpenAIAPIKey: "test-key"}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	req := httptest.NewRequest(http.MethodGet, "/transcribe", nil)
 	w := httptest.NewRecorder()
@@ -103,7 +111,7 @@ func TestTranscribeHandler_HandleTranscribe_NoFile(t *testing.T) {
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	// Create empty multipart form
 	body := &bytes.Buffer{}
@@ -130,7 +138,7 @@ func TestTranscribeHandler_HandleTranscribe_InvalidFileType(t *testing.T) {
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	// Create multipart form with invalid file
 	body := &bytes.Buffer{}
@@ -158,7 +166,7 @@ func TestTranscribeHandler_ValidateFile(t *testing.T) {
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	tests := []struct {
 		filename string
@@ -212,7 +220,7 @@ func TestTranscribeHandler_HandleHealth(t *testing.T) {
 	cfg := &config.Config{OpenAIAPIKey: "test-key"}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -241,7 +249,7 @@ func TestTranscribeHandler_HandleMetrics(t *testing.T) {
 	cfg := &config.Config{OpenAIAPIKey: "test-key"}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	// Test with nil metrics (no stats interface)
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -272,7 +280,7 @@ func TestTranscribeHandler_HandleMetrics_WithStats(t *testing.T) {
 	cfg := &config.Config{OpenAIAPIKey: "test-key"}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	templateService := &mockTemplateService{}
-	handler := NewTranscribeHandler(cfg, logger, templateService)
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
 	
 	mockStats := &mockMetrics{
 		stats: map[string]interface{}{

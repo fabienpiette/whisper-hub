@@ -51,6 +51,11 @@ type MetricsProvider interface {
 	GetStats() map[string]interface{}
 }
 
+// MetricsTracker defines the interface for tracking metrics
+type MetricsTracker interface {
+	TrackHistoryFeatureUsage(action string)
+}
+
 // ConfigProvider defines the interface for configuration access
 type ConfigProvider interface {
 	GetOpenAIAPIKey() string
