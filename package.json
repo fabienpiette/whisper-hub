@@ -5,7 +5,13 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:performance": "jest test/performance_test.js test/virtual-scroller-test.js",
+    "test:security": "jest test/security_test.js",
+    "test:integration": "jest test/frontend_integration_test.js",
+    "test:critical": "jest test/simplified-test.js",
+    "test:all": "jest --verbose",
+    "perf:monitor": "echo 'Performance monitoring available in browser dev mode'"
   },
   "devDependencies": {
     "jest": "^29.7.0",

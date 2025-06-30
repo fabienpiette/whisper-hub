@@ -1,0 +1,274 @@
+/**
+ * Performance-Optimized Styles
+ * CSS optimizations for virtual scrolling and efficient rendering
+ */
+
+/* Virtual Scroller Optimizations */
+.virtual-scroller {
+    contain: layout style paint;
+    will-change: scroll-position;
+    -webkit-overflow-scrolling: touch;
+}
+
+.virtual-scroller .viewport {
+    contain: layout style;
+}
+
+/* Performant History Items */
+.performant-item {
+    contain: layout style paint;
+    transform: translateZ(0); /* Force GPU layer */
+    will-change: auto;
+    transition: none; /* Remove transitions for better performance */
+}
+
+.performant-item:hover {
+    transform: translateZ(0) scale(1.01);
+    transition: transform 0.1s ease-out;
+}
+
+/* Efficient Layout Classes */
+.gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+.layout-contained {
+    contain: layout;
+}
+
+.style-contained {
+    contain: style;
+}
+
+.paint-contained {
+    contain: paint;
+}
+
+.size-contained {
+    contain: size;
+}
+
+.strictly-contained {
+    contain: strict;
+}
+
+/* Performance Monitoring */
+.perf-monitor {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.perf-monitor.hidden {
+    display: none;
+}
+
+/* Optimized Animations */
+@media (prefers-reduced-motion: no-preference) {
+    .smooth-scroll {
+        scroll-behavior: smooth;
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.2s ease-out;
+    }
+    
+    .slide-in {
+        animation: slideIn 0.3s ease-out;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .smooth-scroll {
+        scroll-behavior: auto;
+    }
+    
+    .fade-in,
+    .slide-in {
+        animation: none;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Memory Efficient Images */
+.lazy-image {
+    background: #f0f0f0;
+    transition: opacity 0.3s;
+}
+
+.lazy-image.loaded {
+    opacity: 1;
+}
+
+.lazy-image.loading {
+    opacity: 0.5;
+}
+
+/* Efficient Grid Layouts */
+.perf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    contain: layout;
+}
+
+.perf-flex {
+    display: flex;
+    contain: layout;
+}
+
+/* Critical CSS for Above-the-Fold Content */
+.critical-content {
+    contain: layout style paint;
+}
+
+.critical-content .loading-skeleton {
+    background: linear-gradient(
+        90deg,
+        #f0f0f0 25%,
+        #e0e0e0 50%,
+        #f0f0f0 75%
+    );
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* High Performance Button Styles */
+.perf-button {
+    contain: layout style;
+    transform: translateZ(0);
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.perf-button:active {
+    transform: translateZ(0) scale(0.98);
+}
+
+/* Optimized Toast Notifications */
+.perf-toast {
+    contain: layout style paint;
+    transform: translateZ(0);
+    will-change: transform, opacity;
+}
+
+.perf-toast.entering {
+    animation: toastEnter 0.3s ease-out;
+}
+
+.perf-toast.exiting {
+    animation: toastExit 0.3s ease-in;
+}
+
+@keyframes toastEnter {
+    from {
+        opacity: 0;
+        transform: translateZ(0) translateY(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateZ(0) translateY(0);
+    }
+}
+
+@keyframes toastExit {
+    from {
+        opacity: 1;
+        transform: translateZ(0) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateZ(0) translateY(-100%);
+    }
+}
+
+/* Performance Debug Styles */
+.debug-performance .performant-item {
+    outline: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+.debug-performance .virtual-scroller {
+    outline: 2px solid rgba(0, 255, 0, 0.5);
+}
+
+.debug-performance .gpu-accelerated {
+    outline: 1px solid rgba(0, 0, 255, 0.3);
+}
+
+/* Resource Hints for Better Loading */
+.preload-hint::before {
+    content: '';
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    background-image: url('/static/icons/sprite.svg');
+}
+
+/* Efficient Typography */
+.perf-text {
+    font-display: swap;
+    text-rendering: optimizeSpeed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mobile Performance Optimizations */
+@media (max-width: 768px) {
+    .performant-item {
+        contain: strict;
+        transform: translate3d(0, 0, 0);
+    }
+    
+    .virtual-scroller {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+}
+
+/* Print Optimizations */
+@media print {
+    .virtual-scroller,
+    .perf-monitor,
+    .performance-debug {
+        display: none !important;
+    }
+    
+    .performant-item {
+        contain: none;
+        transform: none;
+        page-break-inside: avoid;
+    }
+}

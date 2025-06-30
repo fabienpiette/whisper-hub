@@ -415,6 +415,75 @@ global.HistoryExporter = class MockHistoryExporter {
     downloadFile() {}
 };
 
+// Add VirtualScroller mock
+global.VirtualScroller = class MockVirtualScroller {
+    constructor(container, options = {}) {
+        this.container = container;
+        this.itemHeight = options.itemHeight || 120;
+        this.bufferSize = options.bufferSize || 5;
+        this.items = [];
+        this.visibleRange = { start: 0, end: 0 };
+        this.init();
+    }
+    
+    init() {
+        this.container.innerHTML = '';
+        this.spacerTop = document.createElement('div');
+        this.viewport = document.createElement('div');
+        this.spacerBottom = document.createElement('div');
+        
+        this.container.appendChild(this.spacerTop);
+        this.container.appendChild(this.viewport);
+        this.container.appendChild(this.spacerBottom);
+    }
+    
+    setItems(items, renderFunction) {
+        this.items = items;
+        this.renderFunction = renderFunction;
+        this.render();
+    }
+    
+    render() {
+        if (!this.renderFunction || this.items.length === 0) return;
+        
+        const visibleCount = Math.ceil(400 / this.itemHeight) + this.bufferSize * 2;
+        const startIndex = 0;
+        const endIndex = Math.min(this.items.length, visibleCount);
+        
+        this.visibleRange = { start: startIndex, end: endIndex };
+        
+        const fragment = document.createDocumentFragment();
+        for (let i = startIndex; i < endIndex; i++) {
+            const element = this.renderFunction(this.items[i], i);
+            fragment.appendChild(element);
+        }
+        
+        this.viewport.innerHTML = '';
+        this.viewport.appendChild(fragment);
+    }
+    
+    handleScroll() {
+        this.render();
+    }
+    
+    scrollToItem(index) {
+        this.container.scrollTop = index * this.itemHeight;
+        // Update visible range based on scroll position
+        const visibleCount = Math.ceil(400 / this.itemHeight) + this.bufferSize * 2;
+        const startIndex = Math.max(0, index - this.bufferSize);
+        const endIndex = Math.min(this.items.length, startIndex + visibleCount);
+        this.visibleRange = { start: startIndex, end: endIndex };
+    }
+    
+    getVisibleRange() {
+        return this.visibleRange;
+    }
+    
+    destroy() {
+        this.container.innerHTML = '';
+    }
+};
+
 // Make mocks available on window
 window.SecurityUtils = global.SecurityUtils;
 window.WhisperApp = global.WhisperApp;
@@ -422,6 +491,7 @@ window.HistoryStorage = global.HistoryStorage;
 window.UIManager = global.UIManager;
 window.FileUploader = global.FileUploader;
 window.HistoryExporter = global.HistoryExporter;
+window.VirtualScroller = global.VirtualScroller;
 
 // Mock localStorage
 const localStorageMock = {
