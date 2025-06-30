@@ -1,6 +1,6 @@
 # 🐳 Docker Deployment Guide
 
-Perfect for self-hosting! Deploy with Docker in under 5 minutes.
+Privacy-first transcription service with enterprise-grade security! Deploy with Docker in under 5 minutes.
 
 ## 🚀 Quick Start Options
 
@@ -141,15 +141,31 @@ docker-compose logs transcribe | jq 'select(.msg=="transcription completed succe
 
 ## 🔒 Security Considerations
 
-- ✅ Runs as non-root user (UID 1001)
-- ✅ No new privileges
-- ✅ Memory limits enforced
-- ✅ Temporary file cleanup (including converted video files)
-- ✅ Audio/video file type validation with corruption detection
-- ✅ File size limits (100MB audio, 2GB video)
-- ✅ OpenAI API compliance (25MB converted audio limit)
-- ✅ CORS middleware for browser cross-origin compatibility
-- ⚠️ API key in environment (consider Docker secrets for production)
+**Enterprise-Grade Security Features:**
+- ✅ **CSRF protection** - secure token validation on all forms
+- ✅ **XSS prevention** - comprehensive input sanitization
+- ✅ **Content Security Policy** - strict script execution controls
+- ✅ **Rate limiting** - protection against abuse and DDoS
+- ✅ **AES-GCM encryption** - client-side data protection
+- ✅ **Input validation** - whitelist-based security controls
+- ✅ **Security headers** - comprehensive HTTP security headers
+
+**Infrastructure Security:**
+- ✅ **Non-root execution** (UID 1001)
+- ✅ **No new privileges** flag set
+- ✅ **Memory limits** enforced
+- ✅ **Automatic file cleanup** (including converted video files)
+- ✅ **File validation** with corruption detection
+- ✅ **Size limits** (100MB audio, 2GB video)
+- ✅ **OpenAI compliance** (25MB converted audio limit)
+- ✅ **CORS middleware** for browser compatibility
+
+**Privacy Protection:**
+- ✅ **Zero server-side storage** - transcriptions never saved to server
+- ✅ **Client-side encryption** - history encrypted before localStorage
+- ✅ **Incognito mode** - option for zero data persistence
+- ✅ **GDPR/CCPA compliance** - full data portability
+- ⚠️ **API key in environment** (consider Docker secrets for production)
 
 ## 🔄 Updates
 
@@ -193,7 +209,10 @@ Verify your OpenAI API key has credits and Whisper access.
 **Mixed content warnings:** Use HTTPS or access via localhost instead of IP address.
 
 ## 🎯 Perfect for:
-- Home labs
-- Small teams
-- Privacy-focused transcription
-- Local AI workflows
+- **Home labs** and personal servers
+- **Small teams** requiring privacy-first transcription
+- **GDPR-compliant** organizations needing data sovereignty
+- **Security-focused** environments requiring enterprise-grade protection
+- **Privacy-conscious** users wanting zero cloud storage
+- **Local AI workflows** and automation
+- **Homelab enthusiasts** wanting production-ready security

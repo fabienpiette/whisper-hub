@@ -8,18 +8,21 @@ import (
 )
 
 type Metrics struct {
-	mu             sync.RWMutex
-	RequestsTotal  map[string]int64
-	RequestsActive int64
-	ResponseTimes  map[string][]time.Duration
-	Errors         map[string]int64
+	mu               sync.RWMutex
+	RequestsTotal    map[string]int64
+	RequestsActive   int64
+	ResponseTimes    map[string][]time.Duration
+	Errors           map[string]int64
+	// Privacy-safe history metrics (no content)
+	HistoryFeature   map[string]int64 // enabled, disabled, cleared, exported
 }
 
 func NewMetrics() *Metrics {
 	return &Metrics{
-		RequestsTotal: make(map[string]int64),
-		ResponseTimes: make(map[string][]time.Duration),
-		Errors:        make(map[string]int64),
+		RequestsTotal:  make(map[string]int64),
+		ResponseTimes:  make(map[string][]time.Duration),
+		Errors:         make(map[string]int64),
+		HistoryFeature: make(map[string]int64),
 	}
 }
 
@@ -28,9 +31,10 @@ func (m *Metrics) GetStats() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"requests_total":  m.RequestsTotal,
-		"requests_active": m.RequestsActive,
-		"errors_total":    m.Errors,
+		"requests_total":    m.RequestsTotal,
+		"requests_active":   m.RequestsActive,
+		"errors_total":      m.Errors,
+		"history_feature":   m.HistoryFeature,
 	}
 
 	// Calculate average response times
@@ -49,6 +53,13 @@ func (m *Metrics) GetStats() map[string]interface{} {
 	return stats
 }
 
+// TrackHistoryFeatureUsage tracks privacy-safe history feature usage
+func (m *Metrics) TrackHistoryFeatureUsage(action string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.HistoryFeature[action]++
+}
+
 func (m *Metrics) RequestMetrics() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,10 +71,7 @@ func (m *Metrics) RequestMetrics() func(http.Handler) http.Handler {
 			m.RequestsActive++
 			m.mu.Unlock()
 
-			rw := &responseWriter{
-				ResponseWriter: w,
-				statusCode:     http.StatusOK,
-			}
+			rw := NewResponseWriter(w)
 
 			next.ServeHTTP(rw, r)
 
@@ -79,8 +87,8 @@ func (m *Metrics) RequestMetrics() func(http.Handler) http.Handler {
 			m.ResponseTimes[path] = append(m.ResponseTimes[path], duration)
 
 			// Track errors (4xx, 5xx)
-			if rw.statusCode >= 400 {
-				key := path + "_" + strconv.Itoa(rw.statusCode)
+			if rw.StatusCode() >= 400 {
+				key := path + "_" + strconv.Itoa(rw.StatusCode())
 				m.Errors[key]++
 			}
 			m.mu.Unlock()

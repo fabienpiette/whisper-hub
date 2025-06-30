@@ -3,51 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whisper Hub</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <title>Whisper Hub - Audio Transcription</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10" 
+            integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" 
+            crossorigin="anonymous"></script>
+    <meta name="description" content="Privacy-first audio and video transcription service">
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🎵 Whisper Hub</h1>
-            <p>Upload your audio or video file and get instant transcription</p>
-        </div>
-        
-        <div class="content">
-            <form hx-post="/transcribe" hx-target="#result" hx-encoding="multipart/form-data" hx-indicator="#loading">
-                <div class="upload-container">
-                    <div class="upload-area" id="upload-area">
-                        <div class="upload-icon">📁</div>
-                        <div class="upload-text">Drop your audio or video file here</div>
-                        <div class="upload-subtext">or click to browse</div>
-                        <div class="format-info">
-                            <div class="format-row">
-                                <span class="format-type">🎵 Audio:</span>
-                                <span class="format-details">MP3, WAV, M4A, OGG, FLAC, AAC (up to 100MB)</span>
-                            </div>
-                            <div class="format-row">
-                                <span class="format-type">🎬 Video:</span>
-                                <span class="format-details">MP4, AVI, MOV, MKV, WEBM (up to 2GB)</span>
+<body class="app-container">
+    <!-- Main Application -->
+    <main class="app-main">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <span class="title-icon">🎵</span>
+                    Whisper Hub
+                </h1>
+                <p class="app-subtitle">Privacy-first audio transcription</p>
+            </div>
+            
+            <!-- Settings & History Toggle -->
+            <div class="header-actions">
+                <button id="history-toggle" class="action-btn" title="Toggle History">
+                    <span class="btn-icon">📚</span>
+                    <span id="history-count" class="count-badge hidden">0</span>
+                </button>
+                <button id="settings-toggle" class="action-btn" title="Settings">
+                    <span class="btn-icon">⚙️</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <div class="upload-card">
+                <!-- Incognito Mode Toggle -->
+                <div class="privacy-controls">
+                    <label class="incognito-toggle">
+                        <input type="checkbox" id="incognito-mode" class="toggle-input">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">
+                            <span class="toggle-icon">🕶️</span>
+                            Incognito Mode
+                        </span>
+                    </label>
+                    <p class="privacy-note">When enabled, transcripts won't be saved to history</p>
+                </div>
+
+                <!-- File Upload -->
+                <form id="transcribe-form" hx-post="/transcribe" hx-target="#result-container" hx-encoding="multipart/form-data">
+                    <input type="hidden" name="csrf_token" id="csrf-token" value="{{.CSRFToken}}">`
+                    <div class="upload-zone" id="upload-zone">
+                        <div class="upload-content">
+                            <div class="upload-icon">📎</div>
+                            <h3 class="upload-title">Drop files here or click to browse</h3>
+                            <p class="upload-description">Support for audio and video files</p>
+                            
+                            <div class="format-support">
+                                <div class="format-group">
+                                    <span class="format-label">🎵 Audio:</span>
+                                    <span class="format-list">MP3, WAV, M4A, OGG, FLAC (100MB max)</span>
+                                </div>
+                                <div class="format-group">
+                                    <span class="format-label">🎬 Video:</span>
+                                    <span class="format-list">MP4, AVI, MOV, MKV, WEBM (2GB max)</span>
+                                </div>
                             </div>
                         </div>
-                        <input type="file" name="audio" accept="audio/*,video/*" required class="file-input" id="file-input">
+                        <input type="file" id="file-input" name="audio" accept="audio/*,video/*" class="file-input" required>
                     </div>
-                    <div class="file-info" id="file-info">
-                        <strong>Selected file:</strong> <span id="file-name"></span><br>
-                        <strong>Size:</strong> <span id="file-size"></span>
+
+                    <!-- File Preview -->
+                    <div id="file-preview" class="file-preview hidden">
+                        <div class="file-info">
+                            <div class="file-icon" id="file-type-icon">📄</div>
+                            <div class="file-details">
+                                <h4 id="file-name" class="file-name"></h4>
+                                <div class="file-meta">
+                                    <span id="file-size" class="file-size"></span>
+                                    <span id="file-duration" class="file-duration"></span>
+                                </div>
+                            </div>
+                            <button type="button" id="remove-file" class="remove-btn" title="Remove file">×</button>
+                        </div>
                     </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="transcribe-btn" class="transcribe-btn" disabled>
+                        <span class="btn-content">
+                            <span class="btn-icon">🎯</span>
+                            <span class="btn-text">Start Transcription</span>
+                        </span>
+                        <div class="btn-loading">
+                            <div class="loading-spinner"></div>
+                            <span>Processing...</span>
+                        </div>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="result-container" class="result-section hidden">
+            <!-- Transcription results will be loaded here via HTMX -->
+        </section>
+
+        <!-- History Panel -->
+        <aside id="history-panel" class="history-panel collapsed">
+            <div class="panel-header">
+                <h2 class="panel-title">Transcription History</h2>
+                <button id="close-history" class="close-btn">×</button>
+            </div>
+
+            <div class="panel-controls">
+                <div class="search-box">
+                    <input type="search" id="history-search" placeholder="Search transcripts..." class="search-input">
+                    <span class="search-icon">🔍</span>
                 </div>
                 
-                <button type="submit" class="btn" id="submit-btn" disabled>
-                    🎯 Transcribe File
-                </button>
-            </form>
-            
-            <div id="result"></div>
-        </div>
-    </div>
+                <div class="filter-controls">
+                    <select id="history-filter" class="filter-select">
+                        <option value="all">All Files</option>
+                        <option value="audio">Audio Only</option>
+                        <option value="video">Video Only</option>
+                        <option value="starred">Starred</option>
+                    </select>
+                    
+                    <div class="action-group">
+                        <button id="export-history" class="icon-btn" title="Export History">📤</button>
+                        <button id="clear-history" class="icon-btn danger" title="Clear All">🗑️</button>
+                    </div>
+                </div>
+            </div>
 
-    <script src="/static/js/main.js"></script>
+            <div class="panel-content">
+                <div id="history-list" class="history-list">
+                    <!-- History items will be populated here -->
+                </div>
+                
+                <div id="history-empty" class="empty-state">
+                    <div class="empty-icon">📝</div>
+                    <h3>No transcriptions yet</h3>
+                    <p>Your transcription history will appear here</p>
+                    <div class="privacy-badge">
+                        <span class="privacy-icon">🔒</span>
+                        <span>Data stays on your device</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Settings Panel -->
+        <aside id="settings-panel" class="settings-panel collapsed">
+            <div class="panel-header">
+                <h2 class="panel-title">Settings</h2>
+                <button id="close-settings" class="close-btn">×</button>
+            </div>
+            
+            <div class="panel-content">
+                <div class="settings-group">
+                    <h3>Privacy</h3>
+                    <label class="setting-item">
+                        <input type="checkbox" id="enable-history" checked>
+                        <span class="setting-label">Enable History</span>
+                        <span class="setting-description">Save transcriptions locally</span>
+                    </label>
+                </div>
+                
+                <div class="settings-group">
+                    <h3>Data Management</h3>
+                    <div class="setting-item">
+                        <span class="setting-label">Storage Used</span>
+                        <span id="storage-usage" class="setting-value">0 MB</span>
+                    </div>
+                    <button id="export-all" class="setting-btn">Export All Data</button>
+                    <button id="clear-all-data" class="setting-btn danger">Clear All Data</button>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Overlay for panels -->
+    <div id="panel-overlay" class="panel-overlay"></div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/security.js"></script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>

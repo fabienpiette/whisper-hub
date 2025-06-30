@@ -164,7 +164,7 @@ document.querySelector('form').addEventListener('htmx:beforeRequest', () => {
     }
 });
 
-document.querySelector('form').addEventListener('htmx:afterRequest', () => {
+document.querySelector('form').addEventListener('htmx:afterRequest', (event) => {
     stopProgressAnimation();
     // Only enable if a valid file is selected
     const hasValidFile = fileInput.files.length > 0 && !uploadArea.classList.contains('invalid');
@@ -172,6 +172,11 @@ document.querySelector('form').addEventListener('htmx:afterRequest', () => {
     submitBtn.textContent = '🎯 Transcribe File';
     uploadArea.classList.remove('uploading', 'video', 'audio');
     submitBtn.classList.remove('video-processing', 'audio-processing');
+    
+    // Check for successful transcription and handle history
+    if (event.detail.xhr.status === 200) {
+        handleTranscriptionSuccess(event.detail.xhr.responseText);
+    }
 });
 
 // Handle HTMX errors specifically
@@ -296,4 +301,77 @@ function downloadTranscript(originalFilename) {
         btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
         btn.style.transform = '';
     }, 2000);
+}
+
+// History Integration
+let historyManager = null;
+
+/**
+ * Initialize history system when DOM is ready
+ */
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Check if history is enabled from server config
+        const config = await fetch('/api/history/config').then(r => r.json()).catch(() => ({ enabled: false }));
+        
+        if (config.enabled && window.HistoryManager) {
+            historyManager = new HistoryManager(config);
+            await historyManager.init();
+            
+            // Initialize UI
+            const historyUI = new HistoryUI(historyManager);
+            historyManager.setUI(historyUI);
+            
+            // Make globally available for debugging
+            window.historyManager = historyManager;
+            
+            console.log('History system initialized successfully');
+        }
+    } catch (error) {
+        console.warn('History system initialization failed:', error);
+    }
+});
+
+/**
+ * Handle successful transcription and extract history metadata
+ */
+function handleTranscriptionSuccess(responseHTML) {
+    if (!historyManager) return;
+    
+    try {
+        // Parse the response HTML to extract history metadata
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(responseHTML, 'text/html');
+        const successDiv = doc.querySelector('.success[data-history-metadata]');
+        
+        if (successDiv) {
+            const metadataJson = successDiv.getAttribute('data-history-metadata');
+            if (metadataJson) {
+                const metadata = JSON.parse(metadataJson);
+                
+                // Extract transcript from the response
+                const transcriptDiv = doc.querySelector('#transcript');
+                const transcript = transcriptDiv ? transcriptDiv.textContent : '';
+                
+                // Get current file info
+                const file = fileInput.files[0];
+                if (file && transcript) {
+                    const transcriptionData = {
+                        filename: file.name,
+                        fileType: metadata.file_type,
+                        fileSize: metadata.file_size,
+                        duration: metadata.duration,
+                        transcript: transcript,
+                        processingTime: metadata.processing_time || 0,
+                        timestamp: new Date(metadata.timestamp).getTime()
+                    };
+                    
+                    // Add to history
+                    historyManager.addTranscription(transcriptionData);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to process transcription for history:', error);
+    }
 }
