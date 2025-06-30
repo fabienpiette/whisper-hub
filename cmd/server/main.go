@@ -47,7 +47,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService)
+	transcribeHandler := handler.NewTranscribeHandler(cfg, logger, templateService, metrics)
+	historyHandler := handler.NewHistoryAssetsHandler(cfg)
 
 	r := mux.NewRouter()
 	
@@ -64,6 +65,12 @@ func main() {
 	
 	// Static file serving
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static/"))))
+	
+	// History assets (if enabled)
+	if cfg.HistoryEnabled {
+		r.PathPrefix(cfg.HistoryJSPath).HandlerFunc(historyHandler.HandleHistoryAssets)
+		r.HandleFunc("/api/history/config", historyHandler.HandleHistoryConfig).Methods("GET")
+	}
 
 	// Public routes
 	r.HandleFunc("/", transcribeHandler.HandleIndex).Methods("GET")
