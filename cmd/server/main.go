@@ -59,7 +59,7 @@ func main() {
 	
 	// Add security middleware
 	r.Use(security.SecurityHeaders)
-	r.Use(globalRateLimit.RateLimit)
+	r.Use(globalRateLimit.RateLimit())
 	r.Use(middleware.CORS())
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.RequestLogger(logger))
