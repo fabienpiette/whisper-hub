@@ -14,6 +14,7 @@ env:
 jobs:
   # Job 1: Go Backend Tests
   backend-tests:
+    fail-fast: false
     name: Backend Tests (Go)
     runs-on: ubuntu-latest
     
@@ -68,14 +69,14 @@ jobs:
         go tool cover -html=coverage.out -o coverage.html
         
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
         flags: backend
         name: backend-coverage
         
     - name: Upload coverage artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report
         path: coverage.html
@@ -101,7 +102,10 @@ jobs:
     - name: Run frontend tests
       run: |
         # Run tests and capture exit code
-        npm test || TEST_EXIT_CODE=$?
+        set +e
+        npm test
+        TEST_EXIT_CODE=$?
+        set -e
         
         # If tests failed but not all tests failed, it's acceptable for now
         if [ "$TEST_EXIT_CODE" != "0" ]; then
@@ -119,7 +123,7 @@ jobs:
       run: npm run test:performance || echo "⚠️  Performance tests need review"
       
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: frontend-test-results
@@ -199,7 +203,7 @@ jobs:
         cat benchmark-results.txt
         
     - name: Upload benchmark results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: benchmark-results
         path: benchmark-results.txt
@@ -247,7 +251,8 @@ jobs:
         
     - name: Run govulncheck
       run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+        # go install golang.org/x/vuln/cmd/govulncheck@latest
+        GO111MODULE=on go install golang.org/x/vuln/cmd/govulncheck@v1.0.1
         govulncheck ./...
         
     - name: Check for TODO/FIXME comments
