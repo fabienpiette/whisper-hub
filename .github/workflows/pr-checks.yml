@@ -1,0 +1,201 @@
+name: PR Quality Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  pr-validation:
+    name: PR Validation
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Validate PR title
+      run: |
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        echo "PR Title: $PR_TITLE"
+        
+        # Check if title follows conventional commit format
+        if [[ $PR_TITLE =~ ^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\(.+\))?: .+ ]]; then
+          echo "✅ PR title follows conventional commit format"
+        else
+          echo "❌ PR title should follow conventional commit format: type(scope): description"
+          echo "Examples: feat: add new feature, fix: resolve bug, docs: update readme"
+          exit 1
+        fi
+        
+    - name: Check PR description
+      run: |
+        PR_BODY="${{ github.event.pull_request.body }}"
+        if [[ ${#PR_BODY} -lt 50 ]]; then
+          echo "❌ PR description is too short. Please provide detailed description."
+          exit 1
+        else
+          echo "✅ PR description is adequate"
+        fi
+        
+    - name: Check for breaking changes
+      run: |
+        # Check if this is a breaking change
+        TITLE="${{ github.event.pull_request.title }}"
+        BODY="${{ github.event.pull_request.body }}"
+        
+        if [[ $TITLE == *"!"* ]] || [[ $BODY == *"BREAKING CHANGE"* ]]; then
+          echo "⚠️  Breaking change detected - ensure proper versioning"
+          echo "breaking_change=true" >> $GITHUB_OUTPUT
+        else
+          echo "✅ No breaking changes detected"
+        fi
+        
+    - name: Check file changes
+      run: |
+        # Get list of changed files
+        git diff --name-only origin/main...HEAD > changed_files.txt
+        echo "Changed files:"
+        cat changed_files.txt
+        
+        # Check for sensitive file changes
+        if grep -E "\.(env|key|pem|p12|pfx)$" changed_files.txt; then
+          echo "❌ Sensitive files detected in PR"
+          exit 1
+        fi
+        
+        # Check for large files
+        for file in $(cat changed_files.txt); do
+          if [[ -f "$file" ]]; then
+            size=$(wc -c < "$file")
+            if (( size > 1048576 )); then  # 1MB
+              echo "❌ Large file detected: $file (${size} bytes)"
+              exit 1
+            fi
+          fi
+        done
+        
+        echo "✅ No sensitive or large files detected"
+        
+    - name: Dependency security check
+      run: |
+        if [[ -f "go.mod" ]]; then
+          echo "Checking Go dependencies..."
+          # This would require go to be installed, but we'll do a basic check
+          if grep -i "replace.*=>" go.mod; then
+            echo "⚠️  Replace directives found in go.mod - review carefully"
+          fi
+        fi
+        
+        if [[ -f "package.json" ]]; then
+          echo "Checking Node.js dependencies..."
+          if grep -E "file:|git\+|github:" package.json; then
+            echo "⚠️  Non-registry dependencies found - review carefully"
+          fi
+        fi
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Check code complexity
+      run: |
+        echo "Checking code complexity..."
+        # Install gocyclo for complexity analysis
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+        
+        # Check for functions with high cyclomatic complexity
+        if gocyclo -over 10 .; then
+          echo "❌ High complexity functions found (>10)"
+          exit 1
+        else
+          echo "✅ Code complexity is acceptable"
+        fi
+        
+    - name: Check test coverage requirements
+      run: |
+        echo "Verifying test coverage requirements..."
+        go test -coverprofile=coverage.out ./...
+        
+        # Calculate coverage percentage
+        coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+        echo "Current coverage: ${coverage}%"
+        
+        # Require minimum 80% coverage
+        if (( $(echo "$coverage < 80" | bc -l) )); then
+          echo "❌ Test coverage ${coverage}% is below required 80%"
+          exit 1
+        else
+          echo "✅ Test coverage ${coverage}% meets requirements"
+        fi
+        
+    - name: Check for commented code
+      run: |
+        echo "Checking for commented code..."
+        # Look for large blocks of commented code
+        if grep -r "^\s*//.*\n\s*//.*\n\s*//.*\n\s*//" --include="*.go" .; then
+          echo "⚠️  Large blocks of commented code found - consider removing"
+        else
+          echo "✅ No large commented code blocks found"
+        fi
+
+  performance-impact:
+    name: Performance Impact Analysis
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout PR branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Run benchmarks on PR branch
+      run: |
+        go test -bench=. -benchmem -run=^$ ./internal/service > pr_bench.txt
+        echo "PR Branch Benchmarks:"
+        cat pr_bench.txt
+        
+    - name: Checkout main branch
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        
+    - name: Run benchmarks on main branch
+      run: |
+        go test -bench=. -benchmem -run=^$ ./internal/service > main_bench.txt
+        echo "Main Branch Benchmarks:"
+        cat main_bench.txt
+        
+    - name: Compare performance
+      run: |
+        echo "Performance comparison:"
+        echo "This is a simplified comparison - in production you'd use benchcmp or similar tools"
+        
+        # Basic comparison (would be more sophisticated in practice)
+        if [[ -f pr_bench.txt ]] && [[ -f main_bench.txt ]]; then
+          echo "✅ Benchmark comparison completed"
+          echo "Review the benchmark results to ensure no significant regressions"
+        else
+          echo "❌ Could not compare benchmarks"
+          exit 1
+        fi

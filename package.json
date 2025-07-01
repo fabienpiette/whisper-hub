@@ -10,6 +10,7 @@
     "test:security": "jest test/security_test.js",
     "test:integration": "jest test/frontend_integration_test.js",
     "test:critical": "jest test/simplified-test.js",
+    "test:e2e": "jest test/frontend_integration_test.js --testTimeout=30000",
     "test:all": "jest --verbose",
     "perf:monitor": "echo 'Performance monitoring available in browser dev mode'"
   },
