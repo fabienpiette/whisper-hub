@@ -78,6 +78,11 @@ OPENAI_API_KEY=sk-your-actual-api-key-here docker-compose up -d
 # Access at http://localhost:8080
 ```
 
+**Health Check Configuration:**
+- Uses reliable `wget --quiet --output-document=-` for health monitoring
+- 15-second startup grace period with 30-second intervals
+- Automatic container restart on health check failures
+
 See [DEPLOYMENT.md](DEPLOYMENT.md) for advanced configuration.
 
 ## 🔧 Manual Installation
