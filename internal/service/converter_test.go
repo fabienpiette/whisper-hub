@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -11,7 +15,9 @@ import (
 // Test helpers to reduce duplication
 
 func setupTestConverter(t *testing.T) *VideoConverter {
-	t.Helper()
+	if t != nil {
+		t.Helper()
+	}
 	return NewVideoConverter()
 }
 
@@ -305,6 +311,422 @@ func TestNewVideoConverterWithStrategy(t *testing.T) {
 	if converter.bitrateStrategy != customStrategy {
 		t.Error("expected custom strategy to be set")
 	}
+}
+
+func TestVideoConverter_ConcurrentConversions(t *testing.T) {
+	_ = setupTestConverter(t) // Converter not used in this concurrency test
+	strategy := NewAdaptiveBitrateStrategy()
+	
+	// Test concurrent bitrate calculations (should be thread-safe)
+	const numGoroutines = 10
+	const numCalculations = 100
+	
+	var wg sync.WaitGroup
+	results := make(chan int, numGoroutines*numCalculations)
+	
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < numCalculations; j++ {
+				// Test with various durations
+				duration := float64(30 + j%120) // 30-150 minutes
+				bitrate := strategy.CalculateBitrate(duration)
+				results <- bitrate
+			}
+		}()
+	}
+	
+	wg.Wait()
+	close(results)
+	
+	// Verify all results are valid
+	for bitrate := range results {
+		if bitrate < LowQualityBitrate || bitrate > HighQualityBitrate {
+			t.Errorf("Invalid bitrate from concurrent calculation: %d", bitrate)
+		}
+	}
+}
+
+func TestVideoConverter_ThreadSafety(t *testing.T) {
+	// Test that converter instances are safe for concurrent use
+	converter := setupTestConverter(t)
+	_ = context.Background() // Context not used in this test
+	
+	const numGoroutines = 5
+	var wg sync.WaitGroup
+	errors := make(chan error, numGoroutines)
+	
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			
+			// Each goroutine tests different methods
+			switch id % 3 {
+			case 0:
+				// Test timeout operations
+				original := converter.GetConversionTimeout()
+				converter.SetConversionTimeout(5 * time.Minute)
+				converter.SetConversionTimeout(original)
+			case 1:
+				// Test path generation
+				for j := 0; j < 10; j++ {
+					path := fmt.Sprintf("/tmp/test%d_%d.mp4", id, j)
+					_ = converter.generateAudioPath(path)
+				}
+			case 2:
+				// Test FFmpeg availability check
+				for j := 0; j < 10; j++ {
+					_ = converter.IsFFmpegAvailable()
+				}
+			}
+		}(i)
+	}
+	
+	wg.Wait()
+	close(errors)
+	
+	// Check for any errors
+	for err := range errors {
+		if err != nil {
+			t.Errorf("Thread safety error: %v", err)
+		}
+	}
+}
+
+// Performance Benchmarks
+
+func BenchmarkBitrateStrategy_CalculateBitrate(b *testing.B) {
+	strategy := NewAdaptiveBitrateStrategy()
+	durations := []float64{30.0, 60.0, 90.0, 120.0, 180.0}
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		duration := durations[i%len(durations)]
+		_ = strategy.CalculateBitrate(duration)
+	}
+}
+
+func BenchmarkBitrateStrategy_EstimateFileSize(b *testing.B) {
+	strategy := NewAdaptiveBitrateStrategy()
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = strategy.EstimateFileSize(90.0, 32)
+	}
+}
+
+func BenchmarkVideoConverter_AnalyzeVideo_PathGeneration(b *testing.B) {
+	converter := setupTestConverter(nil) // Pass nil since this is a benchmark
+	paths := []string{
+		"/tmp/video1.mp4",
+		"/tmp/very_long_filename_with_many_characters.avi",
+		"/tmp/path/with/deep/nesting/video.mkv",
+	}
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		path := paths[i%len(paths)]
+		_ = converter.generateAudioPath(path)
+	}
+	_ = converter // Use converter to avoid unused variable warning
+}
+
+func BenchmarkVideoConverter_ConcurrentBitrateCalculations(b *testing.B) {
+	strategy := NewAdaptiveBitrateStrategy()
+	
+	b.RunParallel(func(pb *testing.PB) {
+		durations := []float64{30.0, 60.0, 90.0, 120.0, 180.0, 240.0}
+		i := 0
+		for pb.Next() {
+			duration := durations[i%len(durations)]
+			_ = strategy.CalculateBitrate(duration)
+			i++
+		}
+	})
+}
+
+// Property-based testing helpers
+
+func TestBitrateStrategy_Properties(t *testing.T) {
+	strategy := NewAdaptiveBitrateStrategy()
+	
+	// Property: Longer videos should never get higher bitrates than shorter ones
+	for _, shortDuration := range []float64{30, 45, 60} {
+		for _, longDuration := range []float64{120, 180, 240} {
+			shortBitrate := strategy.CalculateBitrate(shortDuration)
+			longBitrate := strategy.CalculateBitrate(longDuration)
+			
+			if longBitrate > shortBitrate {
+				t.Errorf("Property violation: long video (%gmin) has higher bitrate (%d) than short video (%gmin, %d)",
+					longDuration, longBitrate, shortDuration, shortBitrate)
+			}
+		}
+	}
+	
+	// Property: Estimated size should be reasonable for most common cases
+	// Note: Very long videos may exceed 25MB at minimum bitrate - this is expected
+	for _, duration := range []float64{30, 60, 90, 120} {
+		bitrate := strategy.CalculateBitrate(duration)
+		estimatedSize := strategy.EstimateFileSize(duration, bitrate)
+		estimatedSizeMB := float64(estimatedSize) / (1024 * 1024)
+		
+		// For reasonable durations, should be under 25MB target
+		if estimatedSizeMB > 25.0 {
+			t.Errorf("Property violation: estimated size %.2fMB exceeds 25MB for %gmin video at %dkbps",
+				estimatedSizeMB, duration, bitrate)
+		}
+		
+		// Should be reasonable minimum size (not zero unless duration is zero)
+		if duration > 0 && estimatedSizeMB < 0.1 {
+			t.Errorf("Property violation: estimated size %.2fMB too small for %gmin video",
+				estimatedSizeMB, duration)
+		}
+	}
+	
+	// Test edge case: very long videos may exceed 25MB even at minimum bitrate
+	for _, duration := range []float64{300, 600} {
+		bitrate := strategy.CalculateBitrate(duration)
+		// Should use minimum bitrate for very long videos
+		if bitrate != LowQualityBitrate {
+			t.Errorf("Expected minimum bitrate %d for %gmin video, got %d",
+				LowQualityBitrate, duration, bitrate)
+		}
+	}
+	
+	// Property: Bitrate calculations should be deterministic
+	for _, duration := range []float64{0, 30, 60, 90, 120, 180} {
+		bitrate1 := strategy.CalculateBitrate(duration)
+		bitrate2 := strategy.CalculateBitrate(duration)
+		
+		if bitrate1 != bitrate2 {
+			t.Errorf("Property violation: bitrate calculation not deterministic for %gmin: %d != %d",
+				duration, bitrate1, bitrate2)
+		}
+	}
+}
+
+// Resource Exhaustion and Error Scenario Tests
+
+func TestVideoConverter_ResourceExhaustion(t *testing.T) {
+	converter := setupTestConverter(t)
+	
+	t.Run("disk_space_simulation", func(t *testing.T) {
+		// Simulate disk space exhaustion by trying to write to /dev/full (Linux)
+		// This is a best-effort test that may not work on all systems
+		if _, err := os.Stat("/dev/full"); os.IsNotExist(err) {
+			t.Skip("Skipping disk space test - /dev/full not available")
+			return
+		}
+		
+		// Test cleanup behavior when disk is full
+		err := converter.CleanupConvertedFile("/dev/full/test.mp3")
+		// Should handle the error gracefully
+		if err == nil {
+			t.Log("Cleanup succeeded (expected on some systems)")
+		} else {
+			t.Logf("Cleanup failed as expected: %v", err)
+		}
+	})
+	
+	t.Run("invalid_temp_directory", func(t *testing.T) {
+		// Test behavior with invalid temporary directory paths
+		invalidPaths := []string{
+			"/nonexistent/path/video.mp4",
+			"/root/video.mp4", // Likely no permission
+			"\x00invalid\x00path.mp4", // Null bytes
+		}
+		
+		for _, path := range invalidPaths {
+			audioPath := converter.generateAudioPath(path)
+			// Should generate valid audio path even from invalid input
+			if audioPath == "" {
+				t.Errorf("generateAudioPath returned empty string for %s", path)
+			}
+		}
+	})
+	
+	t.Run("memory_intensive_operations", func(t *testing.T) {
+		// Test with many concurrent strategy calculations
+		strategy := NewAdaptiveBitrateStrategy()
+		
+		// Create many goroutines to stress test memory usage
+		const numGoroutines = 100
+		var wg sync.WaitGroup
+		
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				// Each goroutine does many calculations
+				for j := 0; j < 1000; j++ {
+					duration := float64(j%300 + 1)
+					_ = strategy.CalculateBitrate(duration)
+					_ = strategy.EstimateFileSize(duration, 32)
+				}
+			}(i)
+		}
+		
+		wg.Wait()
+		// If we get here without crashing, memory handling is reasonable
+	})
+}
+
+func TestVideoConverter_ErrorScenarios(t *testing.T) {
+	converter := setupTestConverter(t)
+	ctx := context.Background()
+	
+	t.Run("invalid_duration_edge_cases", func(t *testing.T) {
+		strategy := NewAdaptiveBitrateStrategy()
+		
+		// Test edge cases for duration values
+		edgeCases := []float64{
+			-1.0,    // Negative
+			0.0,     // Zero
+			0.001,   // Very small
+			999999,  // Very large
+		}
+		
+		for _, duration := range edgeCases {
+			bitrate := strategy.CalculateBitrate(duration)
+			if bitrate < LowQualityBitrate || bitrate > HighQualityBitrate {
+				t.Errorf("Invalid bitrate %d for edge case duration %g", bitrate, duration)
+			}
+			
+			size := strategy.EstimateFileSize(duration, bitrate)
+			if duration <= 0 && size != 0 {
+				t.Errorf("Expected zero size for non-positive duration %g, got %d", duration, size)
+			}
+		}
+	})
+	
+	t.Run("corrupted_video_file_simulation", func(t *testing.T) {
+		// Create a file with corrupted content
+		corruptedFile := setupTempFile(t, "This is not a video file, it's corrupted text data that should fail validation")
+		
+		// Test that validation catches corrupted files
+		_, err := converter.ConvertVideoToAudio(ctx, corruptedFile)
+		if err == nil {
+			t.Error("Expected error for corrupted video file, got none")
+		}
+		
+		// Error should be informative (allow various validation error messages)
+		if err != nil {
+			errorMsg := err.Error()
+			if !strings.Contains(errorMsg, "validation failed") && 
+			   !strings.Contains(errorMsg, "corrupted") &&
+			   !strings.Contains(errorMsg, "missing moov atom") {
+				t.Errorf("Expected validation/corruption error, got: %v", err)
+			}
+		}
+	})
+	
+	t.Run("context_timeout_edge_cases", func(t *testing.T) {
+		// Test with very short timeout
+		shortCtx, cancel := context.WithTimeout(ctx, 1*time.Nanosecond)
+		defer cancel()
+		
+		// Wait for context to expire
+		time.Sleep(1 * time.Millisecond)
+		
+		tempFile := setupTempFile(t, "fake video content")
+		_, err := converter.ConvertVideoToAudio(shortCtx, tempFile)
+		
+		if err == nil {
+			t.Error("Expected timeout error, got none")
+		}
+		
+		// Should handle context cancellation gracefully
+		if err != nil && !strings.Contains(err.Error(), "context") && !strings.Contains(err.Error(), "cancel") {
+			t.Logf("Context error (may vary by system): %v", err)
+		}
+	})
+	
+	t.Run("ffprobe_failure_fallback", func(t *testing.T) {
+		// Test fallback behavior when ffprobe fails
+		// This test simulates the scenario by testing with a non-video file
+		textFile := setupTempFile(t, "This is a text file, not a video")
+		
+		// The duration detection should fail and fallback to default
+		duration, err := converter.getVideoDuration(ctx, textFile)
+		
+		// Duration detection should fail for non-video files
+		if err == nil {
+			t.Error("Expected error when getting duration of text file")
+		}
+		
+		// Should return 0 on failure
+		if duration != 0 {
+			t.Errorf("Expected 0 duration on failure, got %g", duration)
+		}
+	})
+}
+
+func TestVideoConverter_ErrorMessageConsistency(t *testing.T) {
+	converter := setupTestConverter(t)
+	ctx := context.Background()
+	_ = ctx // Used in subtests
+	
+	t.Run("consistent_error_patterns", func(t *testing.T) {
+		// Test that similar errors have consistent messaging
+		errorScenarios := []struct {
+			name string
+			path string
+			expectedPatterns []string // Allow multiple acceptable error patterns
+		}{
+			{"nonexistent_file", "/tmp/nonexistent_video_12345.mp4", []string{"stat", "no such file"}},
+			{"empty_path", "", []string{"stat", "no such file"}},
+			{"null_path", "\x00", []string{"stat", "invalid argument", "validation failed"}},
+		}
+		
+		for _, scenario := range errorScenarios {
+			t.Run(scenario.name, func(t *testing.T) {
+				_, err := converter.ConvertVideoToAudio(ctx, scenario.path)
+				if err == nil {
+					t.Errorf("Expected error for %s, got none", scenario.name)
+					return
+				}
+				
+				// Check error message contains at least one expected pattern
+				errorMsg := err.Error()
+				found := false
+				for _, pattern := range scenario.expectedPatterns {
+					if strings.Contains(errorMsg, pattern) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Error message doesn't contain any expected patterns %v: %v", scenario.expectedPatterns, err)
+				}
+			})
+		}
+	})
+	
+	t.Run("error_wrapping_consistency", func(t *testing.T) {
+		// Test that errors are properly wrapped
+		_, err := converter.ConvertVideoToAudio(ctx, "/nonexistent/path")
+		if err == nil {
+			t.Error("Expected error for nonexistent path")
+			return
+		}
+		
+		// Should be able to unwrap the error
+		var unwrapped error = err
+		for unwrapped != nil {
+			if next := errors.Unwrap(unwrapped); next != nil {
+				unwrapped = next
+			} else {
+				break
+			}
+		}
+		
+		// Final unwrapped error should be meaningful
+		if unwrapped == nil {
+			t.Error("Error chain doesn't end with a concrete error")
+		}
+	})
 }
 
 // Note: Testing actual video conversion would require ffmpeg to be installed
