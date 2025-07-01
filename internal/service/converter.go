@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +20,18 @@ import (
 const (
 	// OpenAI Whisper API file size limit (25MB)
 	MaxAudioFileSize = 25 * 1024 * 1024 // 26214400 bytes
+	
+	// Safe target size (24MB to leave margin)
+	TargetAudioFileSize = 24 * 1024 * 1024
+	
+	// Bitrate constants (kbps)
+	HighQualityBitrate = 64
+	MediumQualityBitrate = 32
+	LowQualityBitrate = 24
+	
+	// Duration thresholds (minutes)
+	ShortVideoDuration = 60
+	MediumVideoDuration = 120
 )
 
 // VideoConverter handles video to audio conversion using FFmpeg
@@ -63,6 +77,13 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 		return "", err
 	}
 
+	// Detect video duration for adaptive bitrate selection
+	duration, err := c.getVideoDuration(ctx, videoPath)
+	if err != nil {
+		c.logger.Warn("failed to detect video duration, using default bitrate", "error", err)
+		duration = 0 // Will use default bitrate
+	}
+
 	// Create output path with .wav extension
 	audioPath := c.generateAudioPath(videoPath)
 
@@ -70,15 +91,21 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	// Build FFmpeg command with error capture
-	cmd := c.buildFFmpegCommand(ctx, videoPath, audioPath)
+	// Build FFmpeg command with adaptive bitrate
+	cmd := c.buildFFmpegCommand(ctx, videoPath, audioPath, duration)
 	
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
+	selectedBitrate := c.calculateOptimalBitrate(duration)
+	estimatedSize := c.estimateAudioFileSize(duration, selectedBitrate)
+
 	c.logger.Info("starting video conversion", 
 		"input", videoPath, 
 		"output", audioPath,
+		"duration_minutes", duration,
+		"selected_bitrate", selectedBitrate,
+		"estimated_size_mb", estimatedSize/(1024*1024),
 		"timeout", c.timeout)
 
 	// Execute conversion
@@ -111,11 +138,11 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 		return "", errors.NewInternalServerError(constants.ErrVideoConversionFailed+": "+stderrOutput, err)
 	}
 
-	duration := time.Since(start)
+	conversionDuration := time.Since(start)
 	c.logger.Info("video conversion completed", 
 		"input", videoPath, 
 		"output", audioPath,
-		"duration", duration)
+		"conversion_duration", conversionDuration)
 
 	// Verify output file exists and has content
 	if stat, err := os.Stat(audioPath); os.IsNotExist(err) {
@@ -184,8 +211,11 @@ func (c *VideoConverter) generateAudioPath(videoPath string) string {
 	return filepath.Join(dir, baseName+"_converted.mp3")
 }
 
-// buildFFmpegCommand constructs the FFmpeg command for video to audio conversion
-func (c *VideoConverter) buildFFmpegCommand(ctx context.Context, inputPath, outputPath string) *exec.Cmd {
+// buildFFmpegCommand constructs the FFmpeg command for video to audio conversion with adaptive bitrate
+func (c *VideoConverter) buildFFmpegCommand(ctx context.Context, inputPath, outputPath string, duration float64) *exec.Cmd {
+	bitrate := c.calculateOptimalBitrate(duration)
+	bitrateStr := fmt.Sprintf("%dk", bitrate)
+	
 	args := []string{
 		"-hide_banner",            // Reduce banner output
 		"-loglevel", "error",      // Only show errors
@@ -194,7 +224,7 @@ func (c *VideoConverter) buildFFmpegCommand(ctx context.Context, inputPath, outp
 		"-acodec", "libmp3lame",   // Audio codec: MP3 LAME encoder
 		"-ar", "16000",            // Audio sample rate: 16kHz (optimal for Whisper)
 		"-ac", "1",                // Audio channels: mono
-		"-b:a", "64k",             // Audio bitrate: 64kbps (good quality, small size)
+		"-b:a", bitrateStr,        // Audio bitrate: adaptive based on duration
 		"-f", "mp3",               // Output format: MP3
 		"-avoid_negative_ts", "make_zero", // Handle timestamp issues
 		"-fflags", "+genpts",      // Generate presentation timestamps
@@ -230,4 +260,79 @@ func (c *VideoConverter) CleanupConvertedFile(audioPath string) error {
 	}
 	
 	return nil
+}
+
+// getVideoDuration extracts video duration in minutes using ffprobe
+func (c *VideoConverter) getVideoDuration(ctx context.Context, videoPath string) (float64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	
+	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "quiet",
+		"-show_entries", "format=duration",
+		"-of", "csv=p=0",
+		videoPath)
+	
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	
+	if err := cmd.Run(); err != nil {
+		return 0, fmt.Errorf("failed to get video duration: %w", err)
+	}
+	
+	durationStr := strings.TrimSpace(stdout.String())
+	durationSeconds, err := strconv.ParseFloat(durationStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse duration '%s': %w", durationStr, err)
+	}
+	
+	// Convert seconds to minutes
+	durationMinutes := durationSeconds / 60.0
+	return durationMinutes, nil
+}
+
+// calculateOptimalBitrate determines the best bitrate based on video duration
+func (c *VideoConverter) calculateOptimalBitrate(durationMinutes float64) int {
+	if durationMinutes <= 0 {
+		// Unknown duration, use default high quality
+		return HighQualityBitrate
+	}
+	
+	// Calculate what bitrate would produce target file size (24MB)
+	// Formula: size_bytes = (bitrate_kbps * 1024 * duration_seconds) / 8
+	// Rearranged: bitrate_kbps = (size_bytes * 8) / (duration_seconds * 1024)
+	durationSeconds := durationMinutes * 60
+	calculatedBitrate := float64(TargetAudioFileSize*8) / (durationSeconds * 1024)
+	
+	// Apply practical limits and thresholds
+	if durationMinutes <= ShortVideoDuration {
+		// Short videos: use high quality if it fits, otherwise calculated
+		if calculatedBitrate >= HighQualityBitrate {
+			return HighQualityBitrate
+		}
+		return int(math.Max(calculatedBitrate, LowQualityBitrate))
+	} else if durationMinutes <= MediumVideoDuration {
+		// Medium videos: prefer medium quality if it fits
+		if calculatedBitrate >= MediumQualityBitrate {
+			return MediumQualityBitrate
+		}
+		return int(math.Max(calculatedBitrate, LowQualityBitrate))
+	} else {
+		// Long videos: use calculated bitrate but ensure minimum quality
+		return int(math.Max(calculatedBitrate, LowQualityBitrate))
+	}
+}
+
+// estimateAudioFileSize estimates the resulting audio file size in bytes
+func (c *VideoConverter) estimateAudioFileSize(durationMinutes float64, bitrateKbps int) int64 {
+	if durationMinutes <= 0 {
+		return 0
+	}
+	
+	// Formula: size_bytes = (bitrate_kbps * 1024 * duration_seconds) / 8
+	// Using 1024 instead of 1000 for more accurate binary calculations
+	durationSeconds := durationMinutes * 60
+	sizeBytes := int64((float64(bitrateKbps) * 1024 * durationSeconds) / 8)
+	
+	return sizeBytes
 }
