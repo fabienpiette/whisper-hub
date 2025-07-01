@@ -8,8 +8,30 @@ import (
 	"time"
 )
 
+// Test helpers to reduce duplication
+
+func setupTestConverter(t *testing.T) *VideoConverter {
+	t.Helper()
+	return NewVideoConverter()
+}
+
+func setupTestConverterWithStrategy(t *testing.T, strategy BitrateStrategy) *VideoConverter {
+	t.Helper()
+	return NewVideoConverterWithStrategy(strategy)
+}
+
+func setupTempFile(t *testing.T, content string) string {
+	t.Helper()
+	tempDir := t.TempDir()
+	tempFile := filepath.Join(tempDir, "test.mp4")
+	if err := os.WriteFile(tempFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	return tempFile
+}
+
 func TestNewVideoConverter(t *testing.T) {
-	converter := NewVideoConverter()
+	converter := setupTestConverter(t)
 	
 	if converter == nil {
 		t.Fatal("NewVideoConverter returned nil")
@@ -21,6 +43,10 @@ func TestNewVideoConverter(t *testing.T) {
 	
 	if converter.timeout != 10*time.Minute {
 		t.Errorf("expected timeout 10m, got %v", converter.timeout)
+	}
+	
+	if converter.bitrateStrategy == nil {
+		t.Error("expected bitrateStrategy to be set")
 	}
 }
 
@@ -190,8 +216,8 @@ func TestVideoConverter_CleanupConvertedFile(t *testing.T) {
 	}
 }
 
-func TestVideoConverter_calculateOptimalBitrate(t *testing.T) {
-	converter := NewVideoConverter()
+func TestAdaptiveBitrateStrategy_CalculateBitrate(t *testing.T) {
+	strategy := NewAdaptiveBitrateStrategy()
 	
 	tests := []struct {
 		name            string
@@ -209,17 +235,17 @@ func TestVideoConverter_calculateOptimalBitrate(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := converter.calculateOptimalBitrate(tt.durationMinutes)
+			result := strategy.CalculateBitrate(tt.durationMinutes)
 			if result < tt.expectedMin || result > tt.expectedMax {
-				t.Errorf("calculateOptimalBitrate(%.1f) = %d, want between %d and %d", 
+				t.Errorf("CalculateBitrate(%.1f) = %d, want between %d and %d", 
 					tt.durationMinutes, result, tt.expectedMin, tt.expectedMax)
 			}
 		})
 	}
 }
 
-func TestVideoConverter_estimateAudioFileSize(t *testing.T) {
-	converter := NewVideoConverter()
+func TestAdaptiveBitrateStrategy_EstimateFileSize(t *testing.T) {
+	strategy := NewAdaptiveBitrateStrategy()
 	
 	tests := []struct {
 		name            string
@@ -236,28 +262,23 @@ func TestVideoConverter_estimateAudioFileSize(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := converter.estimateAudioFileSize(tt.durationMinutes, tt.bitrateKbps)
+			result := strategy.EstimateFileSize(tt.durationMinutes, tt.bitrateKbps)
 			resultMB := float64(result) / (1024 * 1024)
 			
 			if resultMB < tt.expectedSizeMB-tt.tolerance || resultMB > tt.expectedSizeMB+tt.tolerance {
-				t.Errorf("estimateAudioFileSize(%.1f, %d) = %.2f MB, want %.2f MB (±%.1f)",
+				t.Errorf("EstimateFileSize(%.1f, %d) = %.2f MB, want %.2f MB (±%.1f)",
 					tt.durationMinutes, tt.bitrateKbps, resultMB, tt.expectedSizeMB, tt.tolerance)
 			}
 		})
 	}
 }
 
-func TestVideoConverter_getVideoDurationUnit(t *testing.T) {
-	// This is a unit test that doesn't require ffprobe to be installed
-	// We're testing the parsing logic by mocking the output
-	converter := NewVideoConverter()
+func TestVideoConverter_IntegratedBitrateSizing(t *testing.T) {
+	// Integration test for the real-world scenario that motivated this feature
+	strategy := NewAdaptiveBitrateStrategy()
 	
-	// Test the duration calculation logic directly
-	// If we had a mock framework, we could test getVideoDuration more thoroughly
-	// For now, we test the core calculation in calculateOptimalBitrate
-	
-	duration := 102.5 // 1 hour 42.5 minutes
-	bitrate := converter.calculateOptimalBitrate(duration)
+	duration := 102.5 // 1 hour 42.5 minutes (real-world case)
+	bitrate := strategy.CalculateBitrate(duration)
 	
 	// For a ~102 minute video, we expect a low-medium bitrate to stay under 25MB
 	if bitrate > 32 {
@@ -268,12 +289,21 @@ func TestVideoConverter_getVideoDurationUnit(t *testing.T) {
 	}
 	
 	// Verify the estimated size would be under 25MB
-	estimatedSize := converter.estimateAudioFileSize(duration, bitrate)
+	estimatedSize := strategy.EstimateFileSize(duration, bitrate)
 	estimatedSizeMB := float64(estimatedSize) / (1024 * 1024)
 	
 	if estimatedSizeMB > 25.0 {
 		t.Errorf("Estimated size %.2f MB exceeds 25MB limit for 102.5 minute video at %d kbps",
 			estimatedSizeMB, bitrate)
+	}
+}
+
+func TestNewVideoConverterWithStrategy(t *testing.T) {
+	customStrategy := NewAdaptiveBitrateStrategy()
+	converter := setupTestConverterWithStrategy(t, customStrategy)
+	
+	if converter.bitrateStrategy != customStrategy {
+		t.Error("expected custom strategy to be set")
 	}
 }
 
