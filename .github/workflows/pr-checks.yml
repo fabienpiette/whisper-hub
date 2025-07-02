@@ -64,16 +64,25 @@ jobs:
         
     - name: Check for breaking changes
       run: |
-        # Check if this is a breaking change
-        TITLE="${{ github.event.pull_request.title }}"
-        BODY="${{ github.event.pull_request.body }}"
+        # Create breaking change detection script
+        cat > check_breaking.sh << 'EOF'
+        #!/bin/bash
+        TITLE="$1"
+        BODY="$2"
+        
+        echo "Checking for breaking changes..."
         
         if [[ $TITLE == *"!"* ]] || [[ $BODY == *"BREAKING CHANGE"* ]]; then
           echo "⚠️  Breaking change detected - ensure proper versioning"
           echo "breaking_change=true" >> $GITHUB_OUTPUT
         else
           echo "✅ No breaking changes detected"
+          echo "breaking_change=false" >> $GITHUB_OUTPUT
         fi
+        EOF
+        
+        chmod +x check_breaking.sh
+        ./check_breaking.sh "${{ github.event.pull_request.title }}" "${{ github.event.pull_request.body }}"
         
     - name: Check file changes
       run: |
@@ -165,9 +174,9 @@ jobs:
         # Convert to number for comparison
         coverage_num=$(echo "$coverage" | cut -d'.' -f1)
         
-        # Require minimum 40% coverage (adjusted based on current state)
-        if [[ $coverage_num -lt 40 ]]; then
-          echo "❌ Test coverage ${coverage}% is below required 40%"
+        # Require minimum 78% coverage (adjusted based on current state)
+        if [[ $coverage_num -lt 78 ]]; then
+          echo "❌ Test coverage ${coverage}% is below required 78%"
           exit 1
         else
           echo "✅ Test coverage ${coverage}% meets requirements"
