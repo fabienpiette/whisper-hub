@@ -197,6 +197,31 @@ Ideal for:
 - If issues persist, try accessing via `localhost` instead of IP address
 - Clear browser cache and reload the page
 
+## 🔧 Development Scripts
+
+The project includes organized scripts for development, CI/CD, and quality assurance:
+
+```bash
+# Setup development environment
+./scripts/dev/setup.sh
+
+# Run comprehensive test coverage analysis
+./scripts/dev/test-coverage.sh
+
+# Run performance benchmarks
+./scripts/dev/run-benchmarks.sh
+
+# Validate code quality and complexity
+./scripts/qa/validate-code-quality.sh
+```
+
+**Script Organization:**
+- `scripts/ci/` - Continuous integration scripts (PR validation)
+- `scripts/dev/` - Development utilities (testing, benchmarks, setup)
+- `scripts/qa/` - Quality assurance tools (code analysis, validation)
+
+See `scripts/README.md` for detailed documentation.
+
 ### Debug Commands
 
 ```bash

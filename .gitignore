@@ -32,6 +32,13 @@ tmp/
 temp/
 *.out
 
+# Development artifacts
+coverage/
+coverage.html
+coverage*.out
+benchmarks/
+logs/
+
 # Claude Code project files
 CLAUDE.md
 .claude/node_modules/
