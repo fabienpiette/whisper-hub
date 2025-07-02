@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -678,6 +679,92 @@ func TestVideoConverter_ErrorScenarios(t *testing.T) {
 			t.Errorf("Expected 0 duration on failure, got %g", duration)
 		}
 	})
+}
+
+func TestVideoConverter_executeConversion(t *testing.T) {
+	converter := setupTestConverter(t)
+	ctx := context.Background()
+	
+	// Test executeConversion with invalid metadata
+	tempDir := t.TempDir()
+	inputPath := tempDir + "/nonexistent.mp4"
+	
+	// Create invalid metadata
+	metadata := &VideoMetadata{
+		DurationMinutes: 0,
+		SelectedBitrate: 0,
+		EstimatedSize:   0,
+	}
+	
+	_, err := converter.executeConversion(ctx, inputPath, metadata)
+	if err == nil {
+		t.Error("Expected error for non-existent input file")
+	}
+}
+
+func TestVideoConverter_runConversion(t *testing.T) {
+	converter := setupTestConverter(t)
+	
+	// Test runConversion with invalid command
+	// Create a command that will fail
+	ctx := context.Background()
+	cmd := exec.CommandContext(ctx, "nonexistent_command", "arg1", "arg2")
+	
+	tempDir := t.TempDir()
+	outputPath := tempDir + "/output.mp3"
+	
+	err := converter.runConversion(cmd, outputPath)
+	if err == nil {
+		t.Error("Expected error for invalid command")
+	}
+}
+
+func TestVideoConverter_logConversionStart(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	converter := NewVideoConverterWithLogger(logger)
+	
+	inputPath := "/test/input.mp4"
+	outputPath := "/test/output.mp3"
+	metadata := &VideoMetadata{
+		DurationMinutes: 120.5,
+		SelectedBitrate: 32,
+		EstimatedSize:   15728640,
+	}
+	
+	// This should not panic or error
+	converter.logConversionStart(inputPath, outputPath, metadata)
+	
+	// Check that something was logged
+	logOutput := buf.String()
+	if logOutput == "" {
+		t.Error("Expected log output but got none")
+	}
+	if !strings.Contains(logOutput, "input.mp4") {
+		t.Error("Expected log to contain input filename")
+	}
+}
+
+func TestVideoConverter_validateOutput(t *testing.T) {
+	converter := setupTestConverter(t)
+	
+	// Test validateOutput with non-existent file
+	err := converter.validateOutput("/nonexistent/output.mp3")
+	if err == nil {
+		t.Error("Expected error for non-existent output file")
+	}
+	
+	// Test validateOutput with existing file
+	tempDir := t.TempDir()
+	validOutput := tempDir + "/valid_output.mp3"
+	if err := os.WriteFile(validOutput, []byte("fake audio data"), 0644); err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	
+	err = converter.validateOutput(validOutput)
+	if err != nil {
+		t.Errorf("validateOutput failed for existing file: %v", err)
+	}
 }
 
 func TestVideoConverter_ErrorMessageConsistency(t *testing.T) {

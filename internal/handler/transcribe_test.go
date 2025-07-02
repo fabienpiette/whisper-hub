@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"whisper-hub/internal/config"
 	"whisper-hub/internal/constants"
@@ -30,6 +31,7 @@ type mockMetricsTracker struct{}
 func (m *mockMetricsTracker) TrackHistoryFeatureUsage(action string) {
 	// Mock implementation - do nothing
 }
+
 
 func TestNewTranscribeHandler(t *testing.T) {
 	cfg := &config.Config{
@@ -331,5 +333,177 @@ func TestTranscribeHandler_HandleCSRFToken(t *testing.T) {
 	body := rr.Body.String()
 	if !strings.Contains(body, "csrf_token") {
 		t.Error("Expected response to contain csrf_token")
+	}
+}
+
+func TestTranscribeHandler_getFileType(t *testing.T) {
+	cfg := &config.Config{OpenAIAPIKey: "test-key"}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	templateService := &mockTemplateService{}
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
+	
+	tests := []struct {
+		filename string
+		expected string
+	}{
+		{"test.mp3", "audio"},
+		{"test.wav", "audio"},
+		{"test.mp4", "video"},
+		{"test.avi", "video"},
+		{"test.mkv", "video"},
+		{"unknown.txt", "audio"}, // defaults to audio
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			result := handler.getFileType(tt.filename)
+			if result != tt.expected {
+				t.Errorf("getFileType(%q) = %q, want %q", tt.filename, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTranscribeHandler_calculateDuration(t *testing.T) {
+	cfg := &config.Config{OpenAIAPIKey: "test-key"}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	templateService := &mockTemplateService{}
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
+	
+	tests := []struct {
+		name             string
+		processingTime   time.Duration
+		transcriptLength int
+		expectNil        bool
+	}{
+		{
+			name:             "empty transcript",
+			processingTime:   time.Second,
+			transcriptLength: 0,
+			expectNil:        true,
+		},
+		{
+			name:             "short transcript",
+			processingTime:   time.Second,
+			transcriptLength: 750, // ~150 words * 5 chars = 1 minute
+			expectNil:        false,
+		},
+		{
+			name:             "long transcript",
+			processingTime:   time.Minute,
+			transcriptLength: 4500, // ~900 words = 6 minutes
+			expectNil:        false,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := handler.calculateDuration(tt.processingTime, tt.transcriptLength)
+			
+			if tt.expectNil {
+				if result != nil {
+					t.Errorf("Expected nil result, got %v", result)
+				}
+			} else {
+				if result == nil {
+					t.Error("Expected non-nil result")
+				} else if *result <= 0 {
+					t.Errorf("Expected positive duration, got %f", *result)
+				}
+			}
+		})
+	}
+}
+
+func TestTranscribeHandler_processTranscription_FileHandling(t *testing.T) {
+	cfg := &config.Config{
+		OpenAIAPIKey:  "test-key",
+		UploadMaxSize: 50 * 1024 * 1024,
+		TempDir:       os.TempDir(),
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	templateService := &mockTemplateService{}
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
+	
+	// Test that processTranscription properly handles file saving
+	// We expect this to fail at the transcription step since we don't have OpenAI API key
+	// but we can test that the file handling logic executes
+	
+	// Create test audio file
+	tempDir := t.TempDir()
+	audioPath := tempDir + "/test.mp3"
+	if err := os.WriteFile(audioPath, []byte("fake audio data"), 0644); err != nil {
+		t.Fatalf("failed to create temp audio file: %v", err)
+	}
+	
+	// Create mock file header
+	header := &multipart.FileHeader{
+		Filename: "test.mp3",
+		Size:     100,
+	}
+	
+	// Create mock file
+	file, err := os.Open(audioPath)
+	if err != nil {
+		t.Fatalf("failed to open test file: %v", err)
+	}
+	defer file.Close()
+	
+	_, _, err = handler.processTranscription(file, header)
+	
+	// We expect this to fail at the transcription step
+	if err == nil {
+		t.Error("expected processTranscription to fail without valid API key")
+	}
+	
+	// But the error should not be about file handling
+	if strings.Contains(err.Error(), "failed to save") {
+		t.Errorf("unexpected file save error: %v", err)
+	}
+}
+
+func TestTranscribeHandler_processTranscription_VideoFileDetection(t *testing.T) {
+	cfg := &config.Config{
+		OpenAIAPIKey:  "test-key",
+		UploadMaxSize: 50 * 1024 * 1024,
+		TempDir:       os.TempDir(),
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	templateService := &mockTemplateService{}
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
+	
+	// Test that processTranscription detects video files and tries to convert them
+	// This will fail at the conversion step without FFmpeg, but tests the logic path
+	
+	// Create test video file
+	tempDir := t.TempDir()
+	videoPath := tempDir + "/test.mp4"
+	if err := os.WriteFile(videoPath, []byte("fake video data"), 0644); err != nil {
+		t.Fatalf("failed to create temp video file: %v", err)
+	}
+	
+	// Create mock file header for video
+	header := &multipart.FileHeader{
+		Filename: "test.mp4",
+		Size:     1000,
+	}
+	
+	// Create mock file
+	file, err := os.Open(videoPath)
+	if err != nil {
+		t.Fatalf("failed to open test file: %v", err)
+	}
+	defer file.Close()
+	
+	_, _, err = handler.processTranscription(file, header)
+	
+	// We expect this to fail, but test that it attempts video conversion
+	if err == nil {
+		t.Error("expected processTranscription to fail")
+	}
+	
+	// Should fail at video conversion or transcription, not file saving
+	if strings.Contains(err.Error(), "failed to save") {
+		t.Errorf("unexpected file save error: %v", err)
 	}
 }
