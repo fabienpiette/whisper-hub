@@ -30,6 +30,57 @@ OPENAI_API_KEY=sk-your-actual-api-key-here docker-compose up -d
 
 That's it! 🎉
 
+### Option 3: Portainer Deployment 🐳
+
+**Easiest GUI-based deployment!** Perfect for Portainer users:
+
+1. **Open Portainer** web interface
+2. Navigate to **Stacks** → **Add stack**
+3. **Name your stack**: `whisper-hub`
+4. **Paste this docker-compose.yml**:
+
+```yaml
+version: "3.8"
+
+services:
+  whisper-hub:
+    image: sighadd/whisper-hub:latest
+    container_name: whisper-hub
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      OPENAI_API_KEY: "sk-your-openai-api-key"  # Replace with your actual key
+      PORT: 8080
+      UPLOAD_MAX_SIZE: 100MB
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+    volumes:
+      - whisper_tmp:/tmp/whisper-hub
+
+volumes:
+  whisper_tmp:
+```
+
+5. **Replace** `sk-your-openai-api-key` with your actual OpenAI API key
+6. **Click** "Deploy the stack"
+7. **Access** at `http://your-server:8080`
+
+**Portainer Benefits:**
+- Visual stack management
+- Easy updates via GUI
+- Built-in monitoring
+- Log viewing interface
+- Resource usage graphs
+
 ### Alternative: Export Environment Variable
 
 ```bash
@@ -169,9 +220,33 @@ docker-compose logs transcribe | jq 'select(.msg=="transcription completed succe
 
 ## 🔄 Updates
 
+### Docker Compose
 ```bash
 docker-compose pull
 docker-compose up -d
+```
+
+### Portainer
+1. Navigate to **Stacks** → **whisper-hub**
+2. Click **Editor** tab
+3. Update the image tag if needed: `sighadd/whisper-hub:latest`
+4. Click **Update the stack**
+
+### Manual Container Updates
+```bash
+# Pull latest image
+docker pull sighadd/whisper-hub:latest
+
+# Stop and remove old container
+docker stop whisper-hub
+docker rm whisper-hub
+
+# Run new container
+docker run -d \
+  --name whisper-hub \
+  -p 8080:8080 \
+  -e OPENAI_API_KEY=sk-your-actual-api-key-here \
+  sighadd/whisper-hub:latest
 ```
 
 ## 🧹 Cleanup

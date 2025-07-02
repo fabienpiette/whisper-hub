@@ -79,12 +79,55 @@ OPENAI_API_KEY=sk-your-actual-api-key-here docker-compose up -d
 # Access at http://localhost:8080
 ```
 
+### Option 3: Portainer Deployment
+You can deploy Whisper Hub easily via Portainer using the following docker-compose.yml:
+
+```yaml
+version: "3.8"
+
+services:
+  whisper-hub:
+    image: sighadd/whisper-hub:latest
+    container_name: whisper-hub
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      OPENAI_API_KEY: "sk-your-openai-api-key"  # Replace with your actual key
+      PORT: 8080
+      UPLOAD_MAX_SIZE: 100MB
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+    volumes:
+      - whisper_tmp:/tmp/whisper-hub
+
+volumes:
+  whisper_tmp:
+```
+
+**Portainer Deployment Steps:**
+1. Open Portainer web interface
+2. Navigate to **Stacks** → **Add stack**
+3. Name your stack: `whisper-hub`
+4. Paste the docker-compose.yml above
+5. Replace `sk-your-openai-api-key` with your actual OpenAI API key
+6. Click **Deploy the stack**
+7. Access at `http://your-server:8080`
+
 **Health Check Configuration:**
 - Uses reliable `wget --quiet --output-document=-` for health monitoring
 - 15-second startup grace period with 30-second intervals
 - Automatic container restart on health check failures
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for advanced configuration.
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for advanced configuration and [Docker Release Guide](docs/DOCKER_RELEASE.md) for Docker Hub releases.
 
 ## 🔧 Manual Installation
 
