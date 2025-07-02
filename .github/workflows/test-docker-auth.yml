@@ -1,0 +1,34 @@
+name: Test Docker Authentication
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if Docker Hub token is set
+        run: |
+          if [[ -z "${{ secrets.DOCKER_HUB_TOKEN }}" ]]; then
+            echo "❌ DOCKER_HUB_TOKEN secret is not set"
+            echo "Please add it in Settings → Secrets and variables → Actions"
+            exit 1
+          else
+            echo "✅ DOCKER_HUB_TOKEN secret is configured"
+            echo "Token length: ${#DOCKER_HUB_TOKEN} characters"
+          fi
+        env:
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Test Docker Hub login
+        uses: docker/login-action@v3
+        with:
+          username: sighadd
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Test repository access
+        run: |
+          echo "✅ Successfully authenticated with Docker Hub"
+          echo "Testing repository access..."
+          docker pull sighadd/whisper-hub:latest || echo "ℹ️  Latest tag not available (normal for new repo)"
+          echo "✅ Authentication test completed"
