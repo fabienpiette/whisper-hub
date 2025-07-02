@@ -312,3 +312,24 @@ func TestTranscribeHandler_HandleMetrics_WithStats(t *testing.T) {
 		t.Error("metrics response should contain timestamp")
 	}
 }
+
+func TestTranscribeHandler_HandleCSRFToken(t *testing.T) {
+	cfg := &config.Config{OpenAIAPIKey: "test-key"}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	templateService := &mockTemplateService{}
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
+	
+	req := httptest.NewRequest("GET", "/csrf-token", nil)
+	rr := httptest.NewRecorder()
+	
+	handler.HandleCSRFToken(rr, req)
+	
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	
+	body := rr.Body.String()
+	if !strings.Contains(body, "csrf_token") {
+		t.Error("Expected response to contain csrf_token")
+	}
+}
