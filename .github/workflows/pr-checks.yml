@@ -22,7 +22,8 @@ jobs:
         echo "PR Title: $PR_TITLE"
         
         # Check if title follows conventional commit format
-        if [[ $PR_TITLE =~ ^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\(.+\))?: .+ ]]; then
+        regex='^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\(.+\))?: .+'
+        if [[ $PR_TITLE =~ $regex ]]; then
           echo "✅ PR title follows conventional commit format"
         else
           echo "❌ PR title should follow conventional commit format: type(scope): description"
