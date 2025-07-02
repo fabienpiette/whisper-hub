@@ -1,0 +1,169 @@
+name: Docker Release to Hub
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.2.3)'
+        required: true
+        type: string
+      platforms:
+        description: 'Target platforms'
+        required: false
+        default: 'linux/amd64,linux/arm64,linux/arm/v7'
+        type: string
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: sighadd/whisper-hub
+
+jobs:
+  docker-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: sighadd
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with git tag for versioned releases
+            type=ref,event=tag
+            # Extract semantic version components
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # Tag as latest for main branch releases
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Manual dispatch version
+            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+          labels: |
+            org.opencontainers.image.title=Whisper Hub
+            org.opencontainers.image.description=Privacy-first self-hosted audio transcription using OpenAI Whisper API
+            org.opencontainers.image.vendor=Whisper Hub
+            org.opencontainers.image.url=https://github.com/fabienpiette/whisper-hub
+            org.opencontainers.image.source=https://github.com/fabienpiette/whisper-hub
+            org.opencontainers.image.documentation=https://github.com/fabienpiette/whisper-hub/blob/main/README.md
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ github.event.inputs.platforms || 'linux/amd64,linux/arm64,linux/arm/v7' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            BUILD_DATE=${{ steps.meta.outputs.created }}
+            VCS_REF=${{ github.sha }}
+
+      - name: Test released image
+        run: |
+          echo "Testing released image..."
+          
+          # Test image can start
+          docker run --rm --name test-whisper \
+            -e OPENAI_API_KEY=test \
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
+            timeout 10s /app/transcribe-server || echo "Expected timeout"
+          
+          # Test FFmpeg is available
+          docker run --rm ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
+            ffmpeg -version | head -1
+          
+          # Test health endpoint
+          docker run -d --name health-test \
+            -p 8080:8080 \
+            -e OPENAI_API_KEY=test \
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          
+          sleep 5
+          curl -f http://localhost:8080/health || exit 1
+          docker stop health-test
+          docker rm health-test
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Extract version from tag
+          VERSION="${{ steps.meta.outputs.version }}"
+          
+          # Generate release notes
+          cat > release_notes.md << EOF
+          ## Docker Image Released: ${VERSION}
+          
+          **Image:** \`sighadd/whisper-hub:${VERSION}\`
+          
+          ### Quick Start
+          \`\`\`bash
+          docker run -d \\
+            --name whisper-hub \\
+            -p 8080:8080 \\
+            -e OPENAI_API_KEY=your-key-here \\
+            sighadd/whisper-hub:${VERSION}
+          \`\`\`
+          
+          ### Supported Platforms
+          - linux/amd64 (Intel/AMD 64-bit)
+          - linux/arm64 (ARM 64-bit, Apple Silicon)
+          - linux/arm/v7 (ARM 32-bit, Raspberry Pi)
+          
+          ### Image Details
+          - **Size:** ~50MB
+          - **Base:** Alpine Linux
+          - **Includes:** FFmpeg, Go runtime
+          - **Security:** Non-root execution, minimal attack surface
+          
+          EOF
+          
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body: ${{ steps.release_notes.outputs.release_notes }}
+          files: |
+            Dockerfile
+            docker-compose.yml
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Docker Hub Description
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: sighadd
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+          repository: sighadd/whisper-hub
+          readme-filepath: ./README.md
