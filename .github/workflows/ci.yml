@@ -14,7 +14,6 @@ env:
 jobs:
   # Job 1: Go Backend Tests
   backend-tests:
-    fail-fast: false
     name: Backend Tests (Go)
     runs-on: ubuntu-latest
     
