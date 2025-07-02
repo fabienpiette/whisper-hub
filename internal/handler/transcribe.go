@@ -52,7 +52,7 @@ func (h *TranscribeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) 
 	data := map[string]interface{}{
 		"CSRFToken": h.security.GetCSRFToken(r),
 	}
-	
+
 	if err := h.templateService.RenderIndex(w, data); err != nil {
 		h.logger.Error("failed to render index template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -62,11 +62,11 @@ func (h *TranscribeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) 
 // HandleCSRFToken provides CSRF tokens for AJAX requests
 func (h *TranscribeHandler) HandleCSRFToken(w http.ResponseWriter, r *http.Request) {
 	token := h.security.GetCSRFToken(r)
-	
+
 	response := map[string]interface{}{
 		"csrf_token": token,
 	}
-	
+
 	h.responseWriter.WriteJSON(w, http.StatusOK, response)
 }
 
@@ -86,8 +86,8 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 	}
 	defer file.Close()
 
-	h.logger.Info("processing transcription request", 
-		"filename", header.Filename, 
+	h.logger.Info("processing transcription request",
+		"filename", header.Filename,
 		"size", header.Size,
 	)
 
@@ -152,23 +152,23 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 	// Determine file type and handle conversion if needed
 	audioFilePath := filePath
 	var convertedAudioPath string
-	
+
 	if h.validator.IsVideoFile(header.Filename) {
 		h.logger.Info("video file detected, converting to audio", "filename", header.Filename)
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), h.videoConverter.GetConversionTimeout())
 		defer cancel()
-		
+
 		convertedPath, err := h.videoConverter.ConvertVideoToAudio(ctx, filePath)
 		if err != nil {
 			h.logger.Error("video conversion failed", "error", err, "filename", header.Filename)
 			return "", 0, &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrVideoConversionFailed, Err: err}
 		}
-		
+
 		audioFilePath = convertedPath
 		convertedAudioPath = convertedPath
 		defer h.videoConverter.CleanupConvertedFile(convertedAudioPath)
-		
+
 		h.logger.Info("video conversion completed", "filename", header.Filename, "audio_path", convertedPath)
 	}
 
@@ -178,17 +178,17 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 	start := time.Now()
 	transcription, err := h.transcriber.TranscribeFile(ctx, audioFilePath)
 	duration := time.Since(start)
-	
+
 	if err != nil {
-		h.logger.Error("transcription failed", 
-			"error", err, 
+		h.logger.Error("transcription failed",
+			"error", err,
 			"filename", header.Filename,
 			"duration_ms", duration.Milliseconds(),
 		)
 		return "", duration, &errors.AppError{Code: http.StatusInternalServerError, Message: constants.ErrTranscribeFailed, Err: err}
 	}
 
-	h.logger.Info("transcription completed successfully", 
+	h.logger.Info("transcription completed successfully",
 		"filename", header.Filename,
 		"duration_ms", duration.Milliseconds(),
 		"transcript_length", len(transcription),
@@ -218,8 +218,6 @@ func (h *TranscribeHandler) calculateDuration(processingTime time.Duration, tran
 	return nil
 }
 
-
-
 func (h *TranscribeHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	health := map[string]interface{}{
 		"status":    constants.HealthyStatus,
@@ -227,7 +225,7 @@ func (h *TranscribeHandler) HandleHealth(w http.ResponseWriter, r *http.Request)
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 		"version":   constants.ServiceVersion,
 	}
-	
+
 	h.responseWriter.WriteJSON(w, http.StatusOK, health)
 }
 

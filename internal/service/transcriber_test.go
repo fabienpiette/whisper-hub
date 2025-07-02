@@ -60,7 +60,7 @@ func TestTranscriber_TranscribeFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			_, err := transcriber.TranscribeFile(ctx, tt.filePath)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TranscribeFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -101,7 +101,7 @@ func TestTranscriber_TranscribeReader(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			_, err := transcriber.TranscribeReader(ctx, tt.reader, tt.filename)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TranscribeReader() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -111,15 +111,15 @@ func TestTranscriber_TranscribeReader(t *testing.T) {
 
 func TestTranscriber_ContextCancellation(t *testing.T) {
 	transcriber := NewTranscriber("test-key")
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
-	
+
 	_, err := transcriber.TranscribeReader(ctx, strings.NewReader("test"), "test.mp3")
 	if err == nil {
 		t.Error("expected error due to cancelled context")
 	}
-	
+
 	if !errors.Is(err, context.Canceled) && !strings.Contains(err.Error(), "context") {
 		t.Errorf("expected context cancellation error, got: %v", err)
 	}

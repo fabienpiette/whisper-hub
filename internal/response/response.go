@@ -6,35 +6,35 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	
+
 	"whisper-hub/internal/constants"
 	"whisper-hub/internal/errors"
 )
 
 // HistoryMetadata contains metadata for client-side history storage
 type HistoryMetadata struct {
-	ID          string    `json:"id"`           // Client-generated UUID
-	Timestamp   time.Time `json:"timestamp"`    // Server timestamp
-	FileType    string    `json:"file_type"`    // audio/video
-	FileSize    int64     `json:"file_size"`    // bytes
-	Duration    *float64  `json:"duration"`     // seconds (if available)
+	ID        string    `json:"id"`        // Client-generated UUID
+	Timestamp time.Time `json:"timestamp"` // Server timestamp
+	FileType  string    `json:"file_type"` // audio/video
+	FileSize  int64     `json:"file_size"` // bytes
+	Duration  *float64  `json:"duration"`  // seconds (if available)
 }
 
 // TranscriptData represents data for the result template
 type TranscriptData struct {
 	Transcript              string
-	Filename               string
-	FileType               string
-	FileSize               int64
-	Duration               *float64
-	ProcessingTime         *time.Duration
-	CharacterCount         int
-	WordCount              int
-	EstimatedReadingTime   string
-	FileSizeFormatted      string
-	DurationFormatted      string
+	Filename                string
+	FileType                string
+	FileSize                int64
+	Duration                *float64
+	ProcessingTime          *time.Duration
+	CharacterCount          int
+	WordCount               int
+	EstimatedReadingTime    string
+	FileSizeFormatted       string
+	DurationFormatted       string
 	ProcessingTimeFormatted string
-	IncognitoMode          bool
+	IncognitoMode           bool
 }
 
 // Writer handles HTTP response writing
@@ -48,13 +48,13 @@ func NewWriter() *Writer {
 // WriteError writes an error response as HTML
 func (w *Writer) WriteError(rw http.ResponseWriter, err error) {
 	var message string
-	
+
 	if appErr, ok := err.(*errors.AppError); ok {
 		message = appErr.Message
 	} else {
 		message = err.Error()
 	}
-	
+
 	// Return 200 OK so HTMX processes the response and shows the error to the user
 	rw.WriteHeader(http.StatusOK)
 	fmt.Fprintf(rw, `<div class="error">❌ Error: %s</div>`, template.HTMLEscapeString(message))
@@ -69,7 +69,7 @@ func (w *Writer) WriteLoading(rw http.ResponseWriter) {
 		<h3>🎵 Transcribing your audio...</h3>
 		<p>This may take a moment depending on file size</p>
 	</div>`)
-	
+
 	if f, ok := rw.(http.Flusher); ok {
 		f.Flush()
 	}
@@ -83,29 +83,29 @@ func (w *Writer) WriteTranscriptionResult(rw http.ResponseWriter, transcription,
 // WriteTranscriptionResultWithMetadata writes a successful transcription result with history metadata
 func (w *Writer) WriteTranscriptionResultWithMetadata(rw http.ResponseWriter, transcription, filename string, metadata *HistoryMetadata) {
 	rw.Header().Set(constants.HeaderContentType, constants.ContentTypeHTML)
-	
+
 	// Create transcript data with all necessary information
 	data := &TranscriptData{
 		Transcript:     transcription,
-		Filename:      filename,
+		Filename:       filename,
 		CharacterCount: len(transcription),
-		WordCount:     w.countWords(transcription),
-		IncognitoMode: false, // TODO: Get from request context
+		WordCount:      w.countWords(transcription),
+		IncognitoMode:  false, // TODO: Get from request context
 	}
-	
+
 	if metadata != nil {
 		data.FileType = metadata.FileType
 		data.FileSize = metadata.FileSize
 		data.Duration = metadata.Duration
 	}
-	
+
 	// Format helper data
 	data.FileSizeFormatted = w.formatFileSize(data.FileSize)
 	if data.Duration != nil {
 		data.DurationFormatted = w.formatDuration(*data.Duration)
 	}
 	data.EstimatedReadingTime = w.estimateReadingTime(data.WordCount)
-	
+
 	// Simple template rendering (we could enhance this with proper template engine)
 	w.renderResultTemplate(rw, data, metadata)
 }
@@ -122,7 +122,7 @@ func (w *Writer) renderResultTemplate(rw http.ResponseWriter, data *TranscriptDa
 			metadata.FileSize,
 		)
 	}
-	
+
 	// Enhanced result template
 	fmt.Fprintf(rw, `
 	<div class="result-card" 
@@ -210,7 +210,7 @@ func (w *Writer) renderResultTemplate(rw http.ResponseWriter, data *TranscriptDa
 				<span class="btn-text">View History</span>
 			</button>
 		</div>
-	</div>`, 
+	</div>`,
 		template.HTMLEscapeString(data.Transcript),
 		template.HTMLEscapeString(data.Filename),
 		template.HTMLEscapeString(data.FileType),
@@ -240,16 +240,16 @@ func (w *Writer) formatFileSize(bytes int64) string {
 	if bytes == 0 {
 		return "0 B"
 	}
-	
+
 	units := []string{"B", "KB", "MB", "GB"}
 	size := float64(bytes)
 	unitIndex := 0
-	
+
 	for size >= 1024 && unitIndex < len(units)-1 {
 		size /= 1024
 		unitIndex++
 	}
-	
+
 	return fmt.Sprintf("%.1f %s", size, units[unitIndex])
 }
 
@@ -291,7 +291,7 @@ func (w *Writer) getFileIcon(fileType string) string {
 func (w *Writer) WriteJSON(rw http.ResponseWriter, statusCode int, data interface{}) {
 	rw.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
 	rw.WriteHeader(statusCode)
-	
+
 	// For simple cases, we'll handle basic types directly
 	switch v := data.(type) {
 	case map[string]interface{}:

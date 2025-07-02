@@ -8,13 +8,13 @@ import (
 )
 
 type Metrics struct {
-	mu               sync.RWMutex
-	RequestsTotal    map[string]int64
-	RequestsActive   int64
-	ResponseTimes    map[string][]time.Duration
-	Errors           map[string]int64
+	mu             sync.RWMutex
+	RequestsTotal  map[string]int64
+	RequestsActive int64
+	ResponseTimes  map[string][]time.Duration
+	Errors         map[string]int64
 	// Privacy-safe history metrics (no content)
-	HistoryFeature   map[string]int64 // enabled, disabled, cleared, exported
+	HistoryFeature map[string]int64 // enabled, disabled, cleared, exported
 }
 
 func NewMetrics() *Metrics {
@@ -31,10 +31,10 @@ func (m *Metrics) GetStats() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"requests_total":    m.RequestsTotal,
-		"requests_active":   m.RequestsActive,
-		"errors_total":      m.Errors,
-		"history_feature":   m.HistoryFeature,
+		"requests_total":  m.RequestsTotal,
+		"requests_active": m.RequestsActive,
+		"errors_total":    m.Errors,
+		"history_feature": m.HistoryFeature,
 	}
 
 	// Calculate average response times
@@ -79,7 +79,7 @@ func (m *Metrics) RequestMetrics() func(http.Handler) http.Handler {
 
 			m.mu.Lock()
 			m.RequestsActive--
-			
+
 			// Store response times (keep last 100 for averages)
 			if len(m.ResponseTimes[path]) >= 100 {
 				m.ResponseTimes[path] = m.ResponseTimes[path][1:]

@@ -5,18 +5,18 @@ import "time"
 // File size limits
 const (
 	DefaultUploadMaxSize = 2 * 1024 * 1024 * 1024 // 2GB in bytes (supports video files)
-	MaxAudioFileSize = 100 * 1024 * 1024  // 100MB
-	MaxVideoFileSize = 2 * 1024 * 1024 * 1024  // 2GB
+	MaxAudioFileSize     = 100 * 1024 * 1024      // 100MB
+	MaxVideoFileSize     = 2 * 1024 * 1024 * 1024 // 2GB
 	MegabytesToBytes     = 1024 * 1024
 )
 
 // Server timeouts
 const (
-	ServerReadTimeout       = 15 * time.Second
-	ServerWriteTimeout      = 600 * time.Second // Long timeout for transcription
-	ServerIdleTimeout       = 60 * time.Second
-	ServerShutdownTimeout   = 30 * time.Second
-	TranscriptionTimeout    = 5 * time.Minute
+	ServerReadTimeout     = 15 * time.Second
+	ServerWriteTimeout    = 600 * time.Second // Long timeout for transcription
+	ServerIdleTimeout     = 60 * time.Second
+	ServerShutdownTimeout = 30 * time.Second
+	TranscriptionTimeout  = 5 * time.Minute
 )
 
 // Rate limiting
@@ -31,7 +31,7 @@ var SupportedAudioExtensions = []string{
 	".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac",
 }
 
-// Supported video file extensions  
+// Supported video file extensions
 var SupportedVideoExtensions = []string{
 	".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v",
 }
@@ -49,15 +49,15 @@ const (
 
 // Error messages
 const (
-	ErrNoAudioFile      = "No audio file provided"
-	ErrInvalidFileType  = "Invalid file type. Please upload an audio or video file."
-	ErrFileTooLarge     = "File too large or invalid form data"
-	ErrTranscribeFailed = "Transcription failed. Please try again."
-	ErrSaveFileFailed   = "Failed to save uploaded file"
-	ErrInternalServer   = "Internal Server Error"
-	ErrRateLimitExceeded = "Rate limit exceeded"
-	ErrMethodNotAllowed = "Method not allowed"
-	ErrMetricsUnavailable = "metrics unavailable"
+	ErrNoAudioFile           = "No audio file provided"
+	ErrInvalidFileType       = "Invalid file type. Please upload an audio or video file."
+	ErrFileTooLarge          = "File too large or invalid form data"
+	ErrTranscribeFailed      = "Transcription failed. Please try again."
+	ErrSaveFileFailed        = "Failed to save uploaded file"
+	ErrInternalServer        = "Internal Server Error"
+	ErrRateLimitExceeded     = "Rate limit exceeded"
+	ErrMethodNotAllowed      = "Method not allowed"
+	ErrMetricsUnavailable    = "metrics unavailable"
 	ErrVideoConversionFailed = "Video conversion failed. Please try again."
 )
 

@@ -129,17 +129,63 @@ volumes:
 
 See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for advanced configuration and [Docker Release Guide](docs/DOCKER_RELEASE.md) for Docker Hub releases.
 
-## 🔧 Manual Installation
+## 🔧 Local Development
 
+### Quick Start
+```bash
+# Complete setup with guided configuration
+make setup
+
+# Run the application
+make run
+
+# Test everything (full CI pipeline locally)
+make ci
+```
+
+### Manual Installation
 ```bash
 # Install dependencies
-go mod tidy
+make deps-all
 
 # Set environment
 export OPENAI_API_KEY="your-key-here"
 
 # Run
-go run cmd/server/main.go
+make run
+# or: go run cmd/server/main.go
+```
+
+### Development Commands
+```bash
+# Testing
+make test              # Run Go tests
+make test-critical     # Run critical frontend tests (13 tests)
+make quick-test        # Fast tests for development
+
+# Code Quality
+make fmt               # Format code
+make check-fmt         # Check if code is formatted
+make vet               # Run Go vet
+make lint              # Security & quality analysis
+make quick-check       # Fast quality check
+
+# CI Pipeline (Local)
+make ci                # Complete CI pipeline
+make ci-backend        # Backend tests & coverage
+make ci-frontend       # Critical frontend tests
+make ci-docker         # Docker build & health tests
+make ci-security       # Security analysis
+
+# Build & Deploy
+make build             # Build binary
+make docker-build      # Build Docker image
+make docker-test       # Test Docker image
+
+# Utilities
+make help              # Show all commands
+make clean             # Clean build artifacts
+make install-tools     # Install development tools
 ```
 
 ## 📋 Requirements
@@ -240,9 +286,30 @@ Ideal for:
 - If issues persist, try accessing via `localhost` instead of IP address
 - Clear browser cache and reload the page
 
-## 🔧 Development Scripts
+## 🔧 Development & CI Pipeline
 
-The project includes organized scripts for development, CI/CD, and quality assurance:
+### Makefile Commands (Recommended)
+
+**Local CI Pipeline:**
+```bash
+make ci                # Complete CI pipeline (matches GitHub Actions)
+make ci-backend        # Backend: deps + format + vet + tests
+make ci-frontend       # Frontend: critical tests (13 tests)
+make ci-docker         # Docker: build + health tests
+make ci-security       # Security: gosec + staticcheck analysis
+```
+
+**Development Workflow:**
+```bash
+make setup             # One-time setup (deps + tools + guidance)
+make quick-check       # Fast check: format + vet + critical tests
+make test-coverage     # Full test coverage analysis
+make lint              # Security & quality analysis
+```
+
+### Legacy Scripts (Still Available)
+
+For direct script access:
 
 ```bash
 # Setup development environment
@@ -259,11 +326,26 @@ The project includes organized scripts for development, CI/CD, and quality assur
 ```
 
 **Script Organization:**
-- `scripts/ci/` - Continuous integration scripts (PR validation)
+- `scripts/ci/` - Continuous integration scripts (automated release, validation)
 - `scripts/dev/` - Development utilities (testing, benchmarks, setup)
 - `scripts/qa/` - Quality assurance tools (code analysis, validation)
 
 See `scripts/README.md` for detailed documentation.
+
+### CI/CD Features
+
+**GitHub Actions Pipeline:**
+- ✅ **Backend Tests**: Go tests with 70%+ coverage
+- ✅ **Frontend Tests**: 13 critical security & functionality tests
+- ✅ **Docker Build**: Multi-stage build validation + health checks  
+- ✅ **Security Analysis**: gosec scanner + staticcheck analysis
+- ✅ **Code Quality**: Formatting validation + Go vet checks
+
+**Local Development:**
+- ✅ **Makefile Integration**: All CI commands available locally
+- ✅ **Quick Feedback**: Fast code quality checks for development  
+- ✅ **Complete Validation**: Full CI pipeline before push
+- ✅ **Tool Installation**: Automated setup of gosec, staticcheck
 
 ### Debug Commands
 

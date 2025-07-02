@@ -31,7 +31,7 @@ func (h *HistoryAssetsHandler) HandleHistoryAssets(w http.ResponseWriter, r *htt
 
 	// Extract the requested file path
 	requestPath := strings.TrimPrefix(r.URL.Path, h.config.HistoryJSPath)
-	
+
 	// Security check: prevent directory traversal
 	if strings.Contains(requestPath, "..") || strings.Contains(requestPath, "/") {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
@@ -66,13 +66,13 @@ func (h *HistoryAssetsHandler) HandleHistoryConfig(w http.ResponseWriter, r *htt
 	}
 
 	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
-	
+
 	// Return client-side configuration (no sensitive data)
 	configJSON := fmt.Sprintf(`{
 		"enabled": true,
 		"maxClientMB": %d,
 		"version": "%s"
 	}`, h.config.HistoryMaxClientMB, constants.ServiceVersion)
-	
+
 	w.Write([]byte(configJSON))
 }

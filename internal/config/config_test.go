@@ -11,7 +11,7 @@ func TestLoad(t *testing.T) {
 	originalPort := os.Getenv("PORT")
 	originalMaxSize := os.Getenv("UPLOAD_MAX_SIZE")
 	originalTempDir := os.Getenv("TEMP_DIR")
-	
+
 	// Clean up after test
 	defer func() {
 		os.Setenv("OPENAI_API_KEY", originalAPIKey)
@@ -19,7 +19,7 @@ func TestLoad(t *testing.T) {
 		os.Setenv("UPLOAD_MAX_SIZE", originalMaxSize)
 		os.Setenv("TEMP_DIR", originalTempDir)
 	}()
-	
+
 	tests := []struct {
 		name        string
 		envVars     map[string]string
@@ -78,7 +78,7 @@ func TestLoad(t *testing.T) {
 			name: "mixed env vars",
 			envVars: map[string]string{
 				"OPENAI_API_KEY":  "sk-mixed-test",
-				"PORT":            "", // Will use default
+				"PORT":            "",        // Will use default
 				"UPLOAD_MAX_SIZE": "1048576", // 1MB
 				"TEMP_DIR":        "/tmp/custom",
 			},
@@ -91,7 +91,7 @@ func TestLoad(t *testing.T) {
 			description: "should mix env vars and defaults correctly",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set env vars for test
@@ -102,9 +102,9 @@ func TestLoad(t *testing.T) {
 					os.Setenv(key, value)
 				}
 			}
-			
+
 			cfg := Load()
-			
+
 			if cfg.OpenAIAPIKey != tt.expected.OpenAIAPIKey {
 				t.Errorf("OpenAIAPIKey = %q, want %q", cfg.OpenAIAPIKey, tt.expected.OpenAIAPIKey)
 			}
@@ -158,19 +158,19 @@ func TestGetEnv(t *testing.T) {
 			expected:     "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up env var after test
 			originalValue := os.Getenv(tt.key)
 			defer os.Setenv(tt.key, originalValue)
-			
+
 			if tt.envValue != "" {
 				os.Setenv(tt.key, tt.envValue)
 			} else {
 				os.Unsetenv(tt.key)
 			}
-			
+
 			result := getEnv(tt.key, tt.defaultValue)
 			if result != tt.expected {
 				t.Errorf("getEnv(%q, %q) = %q, want %q", tt.key, tt.defaultValue, result, tt.expected)
@@ -181,22 +181,22 @@ func TestGetEnv(t *testing.T) {
 
 func TestConfig_Validation(t *testing.T) {
 	cfg := Load()
-	
+
 	// Test that config struct is properly initialized
 	if cfg == nil {
 		t.Fatal("Load() returned nil config")
 	}
-	
+
 	// Port should be a valid string
 	if cfg.Port == "" {
 		t.Error("Port should not be empty")
 	}
-	
+
 	// UploadMaxSize should be non-negative
 	if cfg.UploadMaxSize < 0 {
 		t.Errorf("UploadMaxSize should not be negative, got %d", cfg.UploadMaxSize)
 	}
-	
+
 	// TempDir should not be empty
 	if cfg.TempDir == "" {
 		t.Error("TempDir should not be empty")

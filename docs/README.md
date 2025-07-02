@@ -9,7 +9,10 @@ Welcome to the comprehensive documentation for Whisper Hub - a privacy-first sel
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide with Docker, Compose, and Portainer
 - **[DOCKER_HUB_TOKEN_SETUP.md](DOCKER_HUB_TOKEN_SETUP.md)** - Setting up Docker Hub authentication
 
-### 🔧 Development & Maintenance
+### 🔧 Development & CI/CD
+- **[Main README](../README.md#-development--ci-pipeline)** - Local development with Makefile commands
+- **[CLAUDE.md](../CLAUDE.md)** - Development guide with CI commands and architecture
+- **[CI_IMPROVEMENTS.md](CI_IMPROVEMENTS.md)** - ✨ **NEW**: Complete CI/CD pipeline improvements and Makefile commands
 - **[DOCKER_RELEASE.md](DOCKER_RELEASE.md)** - Complete guide for releasing Docker images
 - **[DOCKER_AUTOMATION.md](DOCKER_AUTOMATION.md)** - CI/CD automation setup with GitHub Actions
 - **[DOCKER_REGISTRY_MANAGEMENT.md](DOCKER_REGISTRY_MANAGEMENT.md)** - Managing Docker Hub registry
@@ -35,9 +38,12 @@ Welcome to the comprehensive documentation for Whisper Hub - a privacy-first sel
 ### For Developers
 | Task | Documentation |
 |------|---------------|
-| **Set up development** | [../scripts/README.md](../scripts/README.md) |
+| **Quick setup** | `make setup` → [Main README](../README.md#quick-start) |
+| **Local CI pipeline** | `make ci` → [Main README](../README.md#development--ci-pipeline) |
+| **Development workflow** | [CLAUDE.md](../CLAUDE.md) → Development Commands |
+| **Testing & quality** | `make quick-check` → [Main README](../README.md#development-commands) |
+| **CI/CD improvements** | [CI_IMPROVEMENTS.md](CI_IMPROVEMENTS.md) → ✨ **NEW** Makefile & pipeline |
 | **Release new version** | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
-| **Docker automation** | [DOCKER_AUTOMATION.md](DOCKER_AUTOMATION.md) |
 | **Performance analysis** | [PERFORMANCE_ANALYSIS.md](PERFORMANCE_ANALYSIS.md) |
 
 ### For Maintainers

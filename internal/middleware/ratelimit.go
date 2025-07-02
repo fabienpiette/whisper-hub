@@ -24,17 +24,17 @@ func NewRateLimiter(requests int, window time.Duration) *RateLimiter {
 		requests: requests,
 		window:   window,
 	}
-	
+
 	// Cleanup goroutine
 	go limiter.cleanup()
-	
+
 	return limiter
 }
 
 func (rl *RateLimiter) cleanup() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		rl.mu.Lock()
 		now := time.Now()
@@ -51,11 +51,11 @@ func (rl *RateLimiter) RateLimit() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := getClientIP(r)
-			
+
 			rl.mu.Lock()
 			clientData, exists := rl.clients[ip]
 			now := time.Now()
-			
+
 			if !exists || now.After(clientData.resetTime) {
 				rl.clients[ip] = &client{
 					requests:  1,
@@ -70,7 +70,7 @@ func (rl *RateLimiter) RateLimit() func(http.Handler) http.Handler {
 				}
 			}
 			rl.mu.Unlock()
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -81,12 +81,12 @@ func getClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		return xff
 	}
-	
+
 	// Check X-Real-IP header
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return xri
 	}
-	
+
 	// Fall back to RemoteAddr
 	return r.RemoteAddr
 }

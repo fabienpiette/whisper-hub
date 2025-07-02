@@ -20,22 +20,22 @@ import (
 const (
 	// OpenAI Whisper API file size limit (25MB)
 	MaxAudioFileSize = 25 * 1024 * 1024 // 26214400 bytes
-	
+
 	// Safe target size (24MB to leave margin)
 	TargetAudioFileSize = 24 * 1024 * 1024
-	
+
 	// Calculation constants
-	BitsPerByte = 8
+	BitsPerByte      = 8
 	BytesPerKilobyte = 1024
 	SecondsPerMinute = 60
-	
+
 	// Bitrate constants (kbps)
-	HighQualityBitrate = 64
+	HighQualityBitrate   = 64
 	MediumQualityBitrate = 32
-	LowQualityBitrate = 24
-	
+	LowQualityBitrate    = 24
+
 	// Duration thresholds (minutes)
-	ShortVideoDuration = 60
+	ShortVideoDuration  = 60
 	MediumVideoDuration = 120
 )
 
@@ -72,11 +72,11 @@ func (s *AdaptiveBitrateStrategy) CalculateBitrate(durationMinutes float64) int 
 	if durationMinutes <= 0 {
 		return s.highBitrate
 	}
-	
+
 	// Calculate what bitrate would produce target file size
 	durationSeconds := durationMinutes * SecondsPerMinute
 	calculatedBitrate := float64(s.targetSize*BitsPerByte) / (durationSeconds * BytesPerKilobyte)
-	
+
 	// Apply thresholds and limits
 	if durationMinutes <= s.shortThreshold {
 		if calculatedBitrate >= float64(s.highBitrate) {
@@ -98,7 +98,7 @@ func (s *AdaptiveBitrateStrategy) EstimateFileSize(durationMinutes float64, bitr
 	if durationMinutes <= 0 {
 		return 0
 	}
-	
+
 	durationSeconds := durationMinutes * SecondsPerMinute
 	sizeBytes := int64((float64(bitrateKbps) * BytesPerKilobyte * durationSeconds) / BitsPerByte)
 	return sizeBytes
@@ -122,7 +122,7 @@ type VideoConverter struct {
 // NewVideoConverter creates a new video converter
 func NewVideoConverter() *VideoConverter {
 	return &VideoConverter{
-		ffmpegPath:      "ffmpeg", // Assumes ffmpeg is in PATH
+		ffmpegPath:      "ffmpeg",         // Assumes ffmpeg is in PATH
 		timeout:         10 * time.Minute, // Increased timeout for large files
 		logger:          slog.Default(),
 		bitrateStrategy: NewAdaptiveBitrateStrategy(),
@@ -154,12 +154,12 @@ func (c *VideoConverter) ConvertVideoToAudio(ctx context.Context, videoPath stri
 	if err := c.validateInput(videoPath); err != nil {
 		return "", err
 	}
-	
+
 	metadata, err := c.analyzeVideo(ctx, videoPath)
 	if err != nil {
 		return "", err
 	}
-	
+
 	return c.executeConversion(ctx, videoPath, metadata)
 }
 
@@ -173,7 +173,7 @@ func (c *VideoConverter) validateInput(videoPath string) error {
 		c.logger.Error("ffmpeg not available", "path", c.ffmpegPath)
 		return c.newInternalError("FFmpeg is not installed or not in PATH", nil)
 	}
-	
+
 	return nil
 }
 
@@ -203,18 +203,18 @@ func (c *VideoConverter) analyzeVideo(ctx context.Context, videoPath string) (*V
 // executeConversion performs the actual video conversion
 func (c *VideoConverter) executeConversion(ctx context.Context, videoPath string, metadata *VideoMetadata) (string, error) {
 	audioPath := c.generateAudioPath(videoPath)
-	
+
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	cmd := c.buildFFmpegCommand(ctx, videoPath, audioPath, metadata.DurationMinutes)
-	
+
 	c.logConversionStart(videoPath, audioPath, metadata)
-	
+
 	if err := c.runConversion(cmd, audioPath); err != nil {
 		return "", err
 	}
-	
+
 	if err := c.validateOutput(audioPath); err != nil {
 		return "", err
 	}
@@ -224,8 +224,8 @@ func (c *VideoConverter) executeConversion(ctx context.Context, videoPath string
 
 // logConversionStart logs conversion parameters
 func (c *VideoConverter) logConversionStart(videoPath, audioPath string, metadata *VideoMetadata) {
-	c.logger.Info("starting video conversion", 
-		"input", videoPath, 
+	c.logger.Info("starting video conversion",
+		"input", videoPath,
 		"output", audioPath,
 		"duration_minutes", metadata.DurationMinutes,
 		"selected_bitrate", metadata.SelectedBitrate,
@@ -241,21 +241,21 @@ func (c *VideoConverter) runConversion(cmd *exec.Cmd, audioPath string) error {
 	start := time.Now()
 	if err := cmd.Run(); err != nil {
 		os.Remove(audioPath) // Clean up failed conversion
-		
+
 		stderrOutput := stderr.String()
-		c.logger.Error("ffmpeg conversion failed", 
+		c.logger.Error("ffmpeg conversion failed",
 			"error", err,
 			"stderr", stderrOutput,
 			"duration", time.Since(start),
 			"exit_code", cmd.ProcessState.ExitCode())
-		
+
 		return c.categorizeConversionError(stderrOutput, err)
 	}
 
-	c.logger.Info("video conversion completed", 
+	c.logger.Info("video conversion completed",
 		"output", audioPath,
 		"conversion_duration", time.Since(start))
-		
+
 	return nil
 }
 
@@ -265,19 +265,19 @@ func (c *VideoConverter) validateOutput(audioPath string) error {
 	if os.IsNotExist(err) {
 		return c.wrapError("stat", audioPath, err)
 	}
-	
+
 	if stat.Size() == 0 {
 		os.Remove(audioPath)
 		return c.newInternalError("Conversion produced empty audio file", nil)
 	}
-	
+
 	if stat.Size() > MaxAudioFileSize {
 		os.Remove(audioPath)
 		return c.newInternalError(
-			fmt.Sprintf("Converted audio file is too large (%d MB). OpenAI Whisper has a 25MB limit. Please use a shorter video or compress it further", 
+			fmt.Sprintf("Converted audio file is too large (%d MB). OpenAI Whisper has a 25MB limit. Please use a shorter video or compress it further",
 				stat.Size()/(BytesPerKilobyte*BytesPerKilobyte)), nil)
 	}
-	
+
 	return nil
 }
 
@@ -292,21 +292,21 @@ func (c *VideoConverter) validateVideoFile(ctx context.Context, videoPath string
 	// Create a quick probe command to check file integrity
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
-	cmd := exec.CommandContext(ctx, c.ffmpegPath, 
-		"-hide_banner", 
+
+	cmd := exec.CommandContext(ctx, c.ffmpegPath,
+		"-hide_banner",
 		"-loglevel", "error",
 		"-i", videoPath,
 		"-t", "1", // Only probe first second
-		"-f", "null", 
+		"-f", "null",
 		"-")
-	
+
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		stderrOutput := stderr.String()
-		
+
 		// Check for specific corruption indicators
 		if strings.Contains(stderrOutput, "moov atom not found") {
 			return errors.NewInternalServerError("Video file is corrupted or incomplete (missing moov atom)", err)
@@ -317,11 +317,11 @@ func (c *VideoConverter) validateVideoFile(ctx context.Context, videoPath string
 		if strings.Contains(stderrOutput, "No such file") {
 			return errors.NewFileError("open", videoPath, err)
 		}
-		
+
 		// Generic validation failure
 		return errors.NewInternalServerError("Video file validation failed: "+stderrOutput, err)
 	}
-	
+
 	return nil
 }
 
@@ -336,27 +336,27 @@ func (c *VideoConverter) generateAudioPath(videoPath string) string {
 func (c *VideoConverter) buildFFmpegCommand(ctx context.Context, inputPath, outputPath string, duration float64) *exec.Cmd {
 	bitrate := c.bitrateStrategy.CalculateBitrate(duration)
 	bitrateStr := fmt.Sprintf("%dk", bitrate)
-	
+
 	args := []string{
-		"-hide_banner",            // Reduce banner output
-		"-loglevel", "error",      // Only show errors
-		"-i", inputPath,           // Input file
-		"-vn",                     // Disable video recording
-		"-acodec", "libmp3lame",   // Audio codec: MP3 LAME encoder
-		"-ar", "16000",            // Audio sample rate: 16kHz (optimal for Whisper)
-		"-ac", "1",                // Audio channels: mono
-		"-b:a", bitrateStr,        // Audio bitrate: adaptive based on duration
-		"-f", "mp3",               // Output format: MP3
+		"-hide_banner",       // Reduce banner output
+		"-loglevel", "error", // Only show errors
+		"-i", inputPath, // Input file
+		"-vn",                   // Disable video recording
+		"-acodec", "libmp3lame", // Audio codec: MP3 LAME encoder
+		"-ar", "16000", // Audio sample rate: 16kHz (optimal for Whisper)
+		"-ac", "1", // Audio channels: mono
+		"-b:a", bitrateStr, // Audio bitrate: adaptive based on duration
+		"-f", "mp3", // Output format: MP3
 		"-avoid_negative_ts", "make_zero", // Handle timestamp issues
-		"-fflags", "+genpts",      // Generate presentation timestamps
+		"-fflags", "+genpts", // Generate presentation timestamps
 		"-max_muxing_queue_size", "1024", // Increase queue size for large files
-		"-y",                      // Overwrite output file
-		outputPath,                // Output file
+		"-y",       // Overwrite output file
+		outputPath, // Output file
 	}
 
 	cmd := exec.CommandContext(ctx, c.ffmpegPath, args...)
 	cmd.Stdout = nil // Suppress stdout
-	
+
 	return cmd
 }
 
@@ -375,11 +375,11 @@ func (c *VideoConverter) CleanupConvertedFile(audioPath string) error {
 	if audioPath == "" {
 		return nil
 	}
-	
+
 	if err := os.Remove(audioPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to cleanup converted audio file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -409,7 +409,7 @@ func (c *VideoConverter) categorizeConversionError(stderrOutput string, original
 	if strings.Contains(stderrOutput, "Disk quota exceeded") || strings.Contains(stderrOutput, "No space left") {
 		return c.newInternalError("Insufficient disk space for conversion", originalErr)
 	}
-	
+
 	return c.newInternalError(constants.ErrVideoConversionFailed+": "+stderrOutput, originalErr)
 }
 
@@ -417,26 +417,26 @@ func (c *VideoConverter) categorizeConversionError(stderrOutput string, original
 func (c *VideoConverter) getVideoDuration(ctx context.Context, videoPath string) (float64, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "quiet",
 		"-show_entries", "format=duration",
 		"-of", "csv=p=0",
 		videoPath)
-	
+
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
-	
+
 	if err := cmd.Run(); err != nil {
 		return 0, fmt.Errorf("failed to get video duration: %w", err)
 	}
-	
+
 	durationStr := strings.TrimSpace(stdout.String())
 	durationSeconds, err := strconv.ParseFloat(durationStr, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse duration '%s': %w", durationStr, err)
 	}
-	
+
 	// Convert seconds to minutes
 	durationMinutes := durationSeconds / SecondsPerMinute
 	return durationMinutes, nil

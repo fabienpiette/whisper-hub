@@ -3,7 +3,7 @@ package validation
 import (
 	"mime/multipart"
 	"strings"
-	
+
 	"whisper-hub/internal/constants"
 	"whisper-hub/internal/errors"
 )
@@ -27,15 +27,15 @@ func (v *AudioFileValidator) ValidateFile(header *multipart.FileHeader) error {
 	if header == nil {
 		return errors.NewValidationError("file", "no file provided")
 	}
-	
+
 	if err := v.validateSize(header.Size); err != nil {
 		return err
 	}
-	
+
 	if err := v.validateExtension(header.Filename); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -48,15 +48,15 @@ func (v *AudioFileValidator) validateExtension(filename string) error {
 	if filename == "" {
 		return errors.NewValidationError("filename", "filename cannot be empty")
 	}
-	
+
 	filename = strings.ToLower(filename)
-	
+
 	for _, ext := range v.supportedExtensions {
 		if strings.HasSuffix(filename, ext) {
 			return nil
 		}
 	}
-	
+
 	return errors.NewValidationError("file_type", constants.ErrInvalidFileType)
 }
 
@@ -64,11 +64,11 @@ func (v *AudioFileValidator) validateSize(size int64) error {
 	if size > v.maxSize {
 		return errors.NewValidationError("file_size", constants.ErrFileTooLarge)
 	}
-	
+
 	if size == 0 {
 		return errors.NewValidationError("file_size", "file cannot be empty")
 	}
-	
+
 	return nil
 }
 

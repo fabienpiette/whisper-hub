@@ -6,12 +6,11 @@ import (
 	"time"
 )
 
-
 func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			
+
 			rw := NewResponseWriter(w)
 
 			// Add request ID for tracing
@@ -19,10 +18,10 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			if requestID == "" {
 				requestID = generateRequestID()
 			}
-			
+
 			// Add request ID to response headers
 			rw.Header().Set("X-Request-ID", requestID)
-			
+
 			// Create logger with request context
 			reqLogger := logger.With(
 				"request_id", requestID,

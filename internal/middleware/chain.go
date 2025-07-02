@@ -73,7 +73,7 @@ func (c *Chain) ApplyToRouter(router interface{}) {
 	type middlewareUser interface {
 		Use(func(http.Handler) http.Handler)
 	}
-	
+
 	if r, ok := router.(middlewareUser); ok {
 		for _, mw := range c.middlewares {
 			r.Use(mw)

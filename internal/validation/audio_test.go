@@ -8,15 +8,15 @@ import (
 func TestNewAudioFileValidator(t *testing.T) {
 	maxSize := int64(1024 * 1024) // 1MB
 	validator := NewAudioFileValidator(maxSize)
-	
+
 	if validator == nil {
 		t.Error("Expected non-nil validator")
 	}
-	
+
 	if validator.maxSize != maxSize {
 		t.Errorf("Expected maxSize %d, got %d", maxSize, validator.maxSize)
 	}
-	
+
 	if len(validator.supportedExtensions) == 0 {
 		t.Error("Expected non-empty supported extensions")
 	}
@@ -24,7 +24,7 @@ func TestNewAudioFileValidator(t *testing.T) {
 
 func TestAudioFileValidator_ValidateFile(t *testing.T) {
 	validator := NewAudioFileValidator(1024) // 1KB limit for testing
-	
+
 	tests := []struct {
 		name        string
 		header      *multipart.FileHeader
@@ -68,7 +68,7 @@ func TestAudioFileValidator_ValidateFile(t *testing.T) {
 			expectError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateFile(tt.header)
@@ -80,8 +80,8 @@ func TestAudioFileValidator_ValidateFile(t *testing.T) {
 }
 
 func TestAudioFileValidator_ValidateExtension(t *testing.T) {
-	validator := NewAudioFileValidator(1024*1024)
-	
+	validator := NewAudioFileValidator(1024 * 1024)
+
 	tests := []struct {
 		filename    string
 		expectError bool
@@ -93,7 +93,7 @@ func TestAudioFileValidator_ValidateExtension(t *testing.T) {
 		{"", true},
 		{"noextension", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			err := validator.ValidateExtension(tt.filename)
@@ -107,7 +107,7 @@ func TestAudioFileValidator_ValidateExtension(t *testing.T) {
 func TestAudioFileValidator_GetSupportedExtensions(t *testing.T) {
 	validator := NewAudioFileValidator(1024)
 	extensions := validator.GetSupportedExtensions()
-	
+
 	if len(extensions) == 0 {
 		t.Error("Expected non-empty extensions list")
 	}

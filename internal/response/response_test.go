@@ -40,18 +40,18 @@ func TestWriter_WriteError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			writer := NewWriter()
 			rw := httptest.NewRecorder()
-			
+
 			writer.WriteError(rw, tt.err)
-			
+
 			if rw.Code != http.StatusOK {
 				t.Errorf("Expected status %d, got %d", http.StatusOK, rw.Code)
 			}
-			
+
 			body := rw.Body.String()
 			if !strings.Contains(body, tt.expected) {
 				t.Errorf("Expected body to contain %q, got %q", tt.expected, body)
 			}
-			
+
 			if !strings.Contains(body, "error") {
 				t.Error("Expected body to contain 'error' class")
 			}
@@ -62,11 +62,11 @@ func TestWriter_WriteError(t *testing.T) {
 func TestWriter_WriteLoading(t *testing.T) {
 	writer := NewWriter()
 	rw := httptest.NewRecorder()
-	
+
 	writer.WriteLoading(rw)
-	
+
 	body := rw.Body.String()
-	
+
 	if !strings.Contains(body, "loading") {
 		t.Error("Expected body to contain 'loading' class")
 	}
@@ -81,14 +81,14 @@ func TestWriter_WriteLoading(t *testing.T) {
 func TestWriter_WriteTranscriptionResult(t *testing.T) {
 	writer := NewWriter()
 	rw := httptest.NewRecorder()
-	
+
 	transcription := "Hello world test transcription"
 	filename := "test.mp3"
-	
+
 	writer.WriteTranscriptionResult(rw, transcription, filename)
-	
+
 	body := rw.Body.String()
-	
+
 	if !strings.Contains(body, transcription) {
 		t.Errorf("Expected body to contain transcription %q", transcription)
 	}
@@ -103,7 +103,7 @@ func TestWriter_WriteTranscriptionResult(t *testing.T) {
 func TestWriter_WriteTranscriptionResultWithMetadata(t *testing.T) {
 	writer := NewWriter()
 	rw := httptest.NewRecorder()
-	
+
 	transcription := "Test transcription with metadata"
 	filename := "test-audio.wav"
 	duration := 45.5
@@ -114,11 +114,11 @@ func TestWriter_WriteTranscriptionResultWithMetadata(t *testing.T) {
 		FileSize:  1024000,
 		Duration:  &duration,
 	}
-	
+
 	writer.WriteTranscriptionResultWithMetadata(rw, transcription, filename, metadata)
-	
+
 	body := rw.Body.String()
-	
+
 	if !strings.Contains(body, transcription) {
 		t.Errorf("Expected body to contain transcription %q", transcription)
 	}
@@ -135,7 +135,7 @@ func TestWriter_WriteTranscriptionResultWithMetadata(t *testing.T) {
 
 func TestWriter_countWords(t *testing.T) {
 	writer := NewWriter()
-	
+
 	tests := []struct {
 		text     string
 		expected int
@@ -146,7 +146,7 @@ func TestWriter_countWords(t *testing.T) {
 		{"  hello   world  ", 2},
 		{"one two three four five", 5},
 	}
-	
+
 	for _, tt := range tests {
 		result := writer.countWords(tt.text)
 		if result != tt.expected {
@@ -157,7 +157,7 @@ func TestWriter_countWords(t *testing.T) {
 
 func TestWriter_formatFileSize(t *testing.T) {
 	writer := NewWriter()
-	
+
 	tests := []struct {
 		bytes    int64
 		expected string
@@ -169,7 +169,7 @@ func TestWriter_formatFileSize(t *testing.T) {
 		{1048576, "1.0 MB"},
 		{1073741824, "1.0 GB"},
 	}
-	
+
 	for _, tt := range tests {
 		result := writer.formatFileSize(tt.bytes)
 		if result != tt.expected {
@@ -180,7 +180,7 @@ func TestWriter_formatFileSize(t *testing.T) {
 
 func TestWriter_formatDuration(t *testing.T) {
 	writer := NewWriter()
-	
+
 	tests := []struct {
 		seconds  float64
 		expected string
@@ -190,7 +190,7 @@ func TestWriter_formatDuration(t *testing.T) {
 		{3600, "1h 0m"},
 		{3750, "1h 2m"},
 	}
-	
+
 	for _, tt := range tests {
 		result := writer.formatDuration(tt.seconds)
 		if result != tt.expected {
@@ -201,7 +201,7 @@ func TestWriter_formatDuration(t *testing.T) {
 
 func TestWriter_estimateReadingTime(t *testing.T) {
 	writer := NewWriter()
-	
+
 	tests := []struct {
 		wordCount int
 		expected  string
@@ -211,7 +211,7 @@ func TestWriter_estimateReadingTime(t *testing.T) {
 		{450, "2 min"},
 		{13500, "1h 0m"}, // 60 minutes worth
 	}
-	
+
 	for _, tt := range tests {
 		result := writer.estimateReadingTime(tt.wordCount)
 		if result != tt.expected {
@@ -222,7 +222,7 @@ func TestWriter_estimateReadingTime(t *testing.T) {
 
 func TestWriter_getFileIcon(t *testing.T) {
 	writer := NewWriter()
-	
+
 	tests := []struct {
 		fileType string
 		expected string
@@ -231,7 +231,7 @@ func TestWriter_getFileIcon(t *testing.T) {
 		{"video", "🎬"},
 		{"unknown", "🎵"},
 	}
-	
+
 	for _, tt := range tests {
 		result := writer.getFileIcon(tt.fileType)
 		if result != tt.expected {
@@ -242,7 +242,7 @@ func TestWriter_getFileIcon(t *testing.T) {
 
 func TestWriter_WriteJSON(t *testing.T) {
 	writer := NewWriter()
-	
+
 	tests := []struct {
 		name       string
 		statusCode int
@@ -262,17 +262,17 @@ func TestWriter_WriteJSON(t *testing.T) {
 			expected:   `{"error": "unsupported response type"}`,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rw := httptest.NewRecorder()
-			
+
 			writer.WriteJSON(rw, tt.statusCode, tt.data)
-			
+
 			if rw.Code != tt.statusCode {
 				t.Errorf("Expected status %d, got %d", tt.statusCode, rw.Code)
 			}
-			
+
 			body := rw.Body.String()
 			if !strings.Contains(body, tt.expected) {
 				t.Errorf("Expected body to contain %q, got %q", tt.expected, body)

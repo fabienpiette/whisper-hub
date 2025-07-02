@@ -12,7 +12,7 @@ import (
 func TestNewHistoryAssetsHandler(t *testing.T) {
 	cfg := &config.Config{HistoryEnabled: true}
 	handler := NewHistoryAssetsHandler(cfg)
-	
+
 	if handler == nil {
 		t.Error("Expected non-nil handler")
 	}
@@ -46,12 +46,12 @@ func TestHistoryAssetsHandler_HandleHistoryAssets(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{HistoryEnabled: tt.historyEnabled}
 			handler := NewHistoryAssetsHandler(cfg)
-			
+
 			req := httptest.NewRequest("GET", tt.path, nil)
 			rr := httptest.NewRecorder()
-			
+
 			handler.HandleHistoryAssets(rr, req)
-			
+
 			if rr.Code != tt.expectedStatusCode {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatusCode, rr.Code)
 			}
@@ -80,20 +80,20 @@ func TestHistoryAssetsHandler_HandleHistoryConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{
-				HistoryEnabled:      tt.historyEnabled,
+				HistoryEnabled:     tt.historyEnabled,
 				HistoryMaxClientMB: 50,
 			}
 			handler := NewHistoryAssetsHandler(cfg)
-			
+
 			req := httptest.NewRequest("GET", "/history/config", nil)
 			rr := httptest.NewRecorder()
-			
+
 			handler.HandleHistoryConfig(rr, req)
-			
+
 			if rr.Code != tt.expectedStatusCode {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatusCode, rr.Code)
 			}
-			
+
 			if tt.historyEnabled && rr.Code == http.StatusOK {
 				body := rr.Body.String()
 				if !strings.Contains(body, "enabled") {

@@ -3,7 +3,7 @@ package validation
 import (
 	"mime/multipart"
 	"strings"
-	
+
 	"whisper-hub/internal/constants"
 	"whisper-hub/internal/errors"
 )
@@ -40,34 +40,34 @@ func (v *FileValidator) ValidateFile(header *multipart.FileHeader) error {
 	if header == nil {
 		return errors.NewValidationError("file", "no file provided")
 	}
-	
+
 	if err := v.validateExtension(header.Filename); err != nil {
 		return err
 	}
-	
+
 	if err := v.validateSize(header.Size, header.Filename); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
 // GetFileType determines if the file is audio or video
 func (v *FileValidator) GetFileType(filename string) FileType {
 	filename = strings.ToLower(filename)
-	
+
 	for _, ext := range v.audioExtensions {
 		if strings.HasSuffix(filename, ext) {
 			return FileTypeAudio
 		}
 	}
-	
+
 	for _, ext := range v.videoExtensions {
 		if strings.HasSuffix(filename, ext) {
 			return FileTypeVideo
 		}
 	}
-	
+
 	return FileTypeUnknown
 }
 
@@ -85,12 +85,12 @@ func (v *FileValidator) validateExtension(filename string) error {
 	if filename == "" {
 		return errors.NewValidationError("filename", "filename cannot be empty")
 	}
-	
+
 	fileType := v.GetFileType(filename)
 	if fileType == FileTypeUnknown {
 		return errors.NewValidationError("file_type", constants.ErrInvalidFileType)
 	}
-	
+
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (v *FileValidator) validateSize(size int64, filename string) error {
 	if size == 0 {
 		return errors.NewValidationError("file_size", "file cannot be empty")
 	}
-	
+
 	// Determine appropriate size limit based on file type
 	var maxSize int64
 	if v.IsVideoFile(filename) {
@@ -106,11 +106,11 @@ func (v *FileValidator) validateSize(size int64, filename string) error {
 	} else {
 		maxSize = v.maxAudioSize
 	}
-	
+
 	if size > maxSize {
 		return errors.NewValidationError("file_size", constants.ErrFileTooLarge)
 	}
-	
+
 	return nil
 }
 

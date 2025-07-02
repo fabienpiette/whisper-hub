@@ -13,22 +13,22 @@ import (
 func CreateMultipartFile(filename, content string) (*bytes.Buffer, string, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	
+
 	part, err := writer.CreateFormFile("audio", filename)
 	if err != nil {
 		return nil, "", err
 	}
-	
+
 	_, err = part.Write([]byte(content))
 	if err != nil {
 		return nil, "", err
 	}
-	
+
 	err = writer.Close()
 	if err != nil {
 		return nil, "", err
 	}
-	
+
 	return body, writer.FormDataContentType(), nil
 }
 
@@ -129,18 +129,18 @@ func CreateMockResponse(statusCode int, body string, headers map[string]string) 
 		Body:       io.NopCloser(bytes.NewReader([]byte(body))),
 		Header:     make(http.Header),
 	}
-	
+
 	for key, value := range headers {
 		resp.Header.Set(key, value)
 	}
-	
+
 	return resp
 }
 
 // TempDirForTest creates a temporary directory for testing and returns cleanup function
 func TempDirForTest(t *testing.T, pattern string) (string, func()) {
 	t.Helper()
-	
+
 	tempDir := t.TempDir()
 	return tempDir, func() {
 		// t.TempDir() automatically cleans up, so this is a no-op

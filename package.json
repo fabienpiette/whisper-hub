@@ -22,7 +22,10 @@
   "jest": {
     "testEnvironment": "jsdom",
     "testMatch": [
-      "**/test/**/*.js"
+      "**/test/**/*_test.js",
+      "**/test/**/*-test.js",
+      "!**/test/setup.js",
+      "!**/test/e2e_test_scenarios.md"
     ],
     "setupFilesAfterEnv": ["<rootDir>/test/setup.js"],
     "collectCoverageFrom": [

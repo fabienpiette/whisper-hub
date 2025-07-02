@@ -10,23 +10,23 @@ import (
 func TestNewFileValidator(t *testing.T) {
 	maxAudioSize := int64(1024 * 1024)
 	validator := NewFileValidator(maxAudioSize)
-	
+
 	if validator == nil {
 		t.Fatal("NewFileValidator returned nil")
 	}
-	
+
 	if validator.maxAudioSize != maxAudioSize {
 		t.Errorf("expected maxAudioSize %d, got %d", maxAudioSize, validator.maxAudioSize)
 	}
-	
+
 	if validator.maxVideoSize != constants.MaxVideoFileSize {
 		t.Errorf("expected maxVideoSize %d, got %d", constants.MaxVideoFileSize, validator.maxVideoSize)
 	}
-	
+
 	if len(validator.audioExtensions) == 0 {
 		t.Error("audioExtensions should not be empty")
 	}
-	
+
 	if len(validator.videoExtensions) == 0 {
 		t.Error("videoExtensions should not be empty")
 	}
@@ -34,7 +34,7 @@ func TestNewFileValidator(t *testing.T) {
 
 func TestFileValidator_GetFileType(t *testing.T) {
 	validator := NewFileValidator(1024 * 1024)
-	
+
 	tests := []struct {
 		filename string
 		expected FileType
@@ -48,7 +48,7 @@ func TestFileValidator_GetFileType(t *testing.T) {
 		{"test.ogg", FileTypeAudio},
 		{"test.flac", FileTypeAudio},
 		{"test.aac", FileTypeAudio},
-		
+
 		// Video files
 		{"test.mp4", FileTypeVideo},
 		{"test.MP4", FileTypeVideo},
@@ -60,7 +60,7 @@ func TestFileValidator_GetFileType(t *testing.T) {
 		{"test.flv", FileTypeVideo},
 		{"test.wmv", FileTypeVideo},
 		{"test.m4v", FileTypeVideo},
-		
+
 		// Unknown files
 		{"test.txt", FileTypeUnknown},
 		{"test.jpg", FileTypeUnknown},
@@ -69,7 +69,7 @@ func TestFileValidator_GetFileType(t *testing.T) {
 		{"", FileTypeUnknown},
 		{"audio.mp3.txt", FileTypeUnknown},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			result := validator.GetFileType(tt.filename)
@@ -82,7 +82,7 @@ func TestFileValidator_GetFileType(t *testing.T) {
 
 func TestFileValidator_IsAudioFile(t *testing.T) {
 	validator := NewFileValidator(1024 * 1024)
-	
+
 	tests := []struct {
 		filename string
 		expected bool
@@ -92,7 +92,7 @@ func TestFileValidator_IsAudioFile(t *testing.T) {
 		{"test.mp4", false},
 		{"test.txt", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			result := validator.IsAudioFile(tt.filename)
@@ -105,7 +105,7 @@ func TestFileValidator_IsAudioFile(t *testing.T) {
 
 func TestFileValidator_IsVideoFile(t *testing.T) {
 	validator := NewFileValidator(1024 * 1024)
-	
+
 	tests := []struct {
 		filename string
 		expected bool
@@ -115,7 +115,7 @@ func TestFileValidator_IsVideoFile(t *testing.T) {
 		{"test.mp3", false},
 		{"test.txt", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			result := validator.IsVideoFile(tt.filename)
@@ -129,7 +129,7 @@ func TestFileValidator_IsVideoFile(t *testing.T) {
 func TestFileValidator_ValidateFile(t *testing.T) {
 	maxAudioSize := int64(1024 * 1024) // 1MB
 	validator := NewFileValidator(maxAudioSize)
-	
+
 	tests := []struct {
 		name     string
 		header   *multipart.FileHeader
@@ -215,11 +215,11 @@ func TestFileValidator_ValidateFile(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateFile(tt.header)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error, got none")
@@ -237,22 +237,22 @@ func TestFileValidator_ValidateFile(t *testing.T) {
 
 func TestFileValidator_GetSupportedExtensions(t *testing.T) {
 	validator := NewFileValidator(1024 * 1024)
-	
+
 	audioExts, videoExts := validator.GetSupportedExtensions()
-	
+
 	if len(audioExts) == 0 {
 		t.Error("audio extensions should not be empty")
 	}
-	
+
 	if len(videoExts) == 0 {
 		t.Error("video extensions should not be empty")
 	}
-	
+
 	// Check that constants match
 	if len(audioExts) != len(constants.SupportedAudioExtensions) {
 		t.Error("audio extensions length mismatch with constants")
 	}
-	
+
 	if len(videoExts) != len(constants.SupportedVideoExtensions) {
 		t.Error("video extensions length mismatch with constants")
 	}
