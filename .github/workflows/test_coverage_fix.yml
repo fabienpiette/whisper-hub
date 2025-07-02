@@ -1,0 +1,29 @@
+# Fix for test coverage CI
+# Replace the existing coverage check with this improved version
+
+- name: Test Coverage (Core Packages)
+  run: |
+    echo "Verifying test coverage for core business logic packages..."
+    
+    # Test core packages that have business logic and tests
+    go test -coverprofile=coverage.out \
+      ./internal/config \
+      ./internal/errors \
+      ./internal/handler \
+      ./internal/response \
+      ./internal/service \
+      ./internal/storage \
+      ./internal/validation
+    
+    # Calculate coverage percentage
+    coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+    echo "Current coverage for core packages: ${coverage}%"
+    
+    # Require minimum 60% coverage for core business logic
+    if (( $(echo "$coverage < 60" | bc -l) )); then
+      echo "❌ Test coverage ${coverage}% is below required 60% for core packages"
+      exit 1
+    else
+      echo "✅ Test coverage ${coverage}% meets requirements for core packages"
+    fi
+  shell: /usr/bin/bash -e {0}
