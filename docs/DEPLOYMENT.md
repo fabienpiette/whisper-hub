@@ -57,11 +57,11 @@ services:
       UPLOAD_MAX_SIZE: 100MB
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--timeout=5", "--output-document=-", "http://localhost:8080/health"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 15s
 
     volumes:
       - whisper_tmp:/tmp/whisper-hub
