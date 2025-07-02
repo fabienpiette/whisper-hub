@@ -97,8 +97,12 @@ jobs:
         context: .
         push: false
         tags: whisper-hub:test
+        load: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        
+    - name: Verify Docker image exists
+      run: docker images whisper-hub:test
         
     - name: Test Docker image
       run: |
