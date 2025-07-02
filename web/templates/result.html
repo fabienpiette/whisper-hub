@@ -88,6 +88,30 @@
         </div>
     </div>
 
+    <!-- Custom Action Results -->
+    <div id="action-results" class="action-results hidden">
+        <div class="action-results-header">
+            <h4 class="action-title">Custom Action Result</h4>
+            <div class="action-meta">
+                <span class="action-name" id="action-name-display"></span>
+                <span class="action-timestamp" id="action-timestamp-display"></span>
+            </div>
+        </div>
+        
+        <div class="action-output-container">
+            <div class="action-output-header">
+                <span class="output-label">Processed Output</span>
+                <div class="output-controls">
+                    <button class="tool-btn copy-action" onclick="whisperApp.copyActionResult()" title="Copy Action Result">📋</button>
+                    <button class="tool-btn download-action" onclick="whisperApp.downloadActionResult()" title="Download Action Result">💾</button>
+                </div>
+            </div>
+            <div class="action-output-content" id="action-output-content">
+                <!-- Processed action output will be displayed here -->
+            </div>
+        </div>
+    </div>
+
     <!-- Quick Actions -->
     <div class="quick-actions">
         <button class="action-btn secondary" onclick="whisperApp.startNewTranscription()">
@@ -347,6 +371,95 @@
     gap: var(--space-1);
 }
 
+.action-results {
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-6);
+    overflow: hidden;
+}
+
+.action-results-header {
+    padding: var(--space-4) var(--space-6);
+    background: var(--color-gray-50);
+    border-bottom: 1px solid var(--color-gray-200);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.action-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-gray-900);
+    margin: 0;
+}
+
+.action-meta {
+    display: flex;
+    gap: var(--space-4);
+    font-size: 0.875rem;
+    color: var(--color-gray-600);
+}
+
+.action-name {
+    font-weight: 500;
+    color: var(--color-primary);
+}
+
+.action-output-container {
+    background: var(--color-white);
+}
+
+.action-output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-6);
+    background: var(--color-gray-50);
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.output-label {
+    font-weight: 500;
+    color: var(--color-gray-900);
+}
+
+.output-controls {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.action-output-content {
+    padding: var(--space-6);
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--color-gray-800);
+    white-space: pre-wrap;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: var(--font-system);
+    background: var(--color-white);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.action-output-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.action-output-content::-webkit-scrollbar-track {
+    background: var(--color-gray-100);
+}
+
+.action-output-content::-webkit-scrollbar-thumb {
+    background: var(--color-gray-300);
+    border-radius: var(--radius-sm);
+}
+
+.action-output-content::-webkit-scrollbar-thumb:hover {
+    background: var(--color-gray-400);
+}
+
 .quick-actions {
     display: flex;
     gap: var(--space-4);
@@ -453,6 +566,100 @@ if (window.whisperApp) {
     // View history
     window.whisperApp.viewHistory = function() {
         this.openPanel('history');
+    };
+    
+    // Copy action result
+    window.whisperApp.copyActionResult = function() {
+        const content = document.getElementById('action-output-content').textContent;
+        navigator.clipboard.writeText(content).then(() => {
+            this.ui.showToast('Action result copied!', 'success');
+        }).catch(err => {
+            console.error('Failed to copy action result:', err);
+            this.ui.showToast('Failed to copy action result', 'error');
+        });
+    };
+    
+    // Download action result
+    window.whisperApp.downloadActionResult = function() {
+        const content = document.getElementById('action-output-content').textContent;
+        const actionName = document.getElementById('action-name-display').textContent || 'action';
+        const container = document.querySelector('.result-card');
+        const filename = container.dataset.filename || 'transcript';
+        
+        const baseName = filename.replace(/\.[^/.]+$/, '');
+        const downloadName = `${baseName}_${actionName.toLowerCase().replace(/\s+/g, '_')}.txt`;
+        const fullContent = `Action: ${actionName}\nFile: ${filename}\nDate: ${new Date().toLocaleString()}\n\n${content}`;
+        
+        this.downloadFile(fullContent, downloadName, 'text/plain');
+        this.ui.showToast('Action result downloaded!', 'success');
+    };
+    
+    // Process action after transcription if action was selected
+    window.whisperApp.processPostAction = function() {
+        const actionSelect = document.getElementById('post-action-selector');
+        if (!actionSelect || !actionSelect.value) return;
+        
+        const selectedActionId = actionSelect.value;
+        this.executeCustomAction(selectedActionId);
+    };
+    
+    // Execute custom action on transcript
+    window.whisperApp.executeCustomAction = async function(actionId) {
+        try {
+            const actions = await this.actionManager.load();
+            const action = actions.find(a => a.id === actionId);
+            
+            if (!action) {
+                this.ui.showToast('Action not found', 'error');
+                return;
+            }
+            
+            // Get transcript data from result
+            const container = document.querySelector('.result-card');
+            if (!container) return;
+            
+            const context = {
+                Transcript: container.dataset.transcript,
+                Filename: container.dataset.filename,
+                Date: new Date().toISOString().split('T')[0],
+                FileType: container.dataset.fileType,
+                Duration: container.dataset.duration || '',
+                WordCount: parseInt(container.dataset.wordCount) || 0,
+                CharCount: parseInt(container.dataset.characterCount) || 0,
+                ProcessingTime: container.dataset.processingTime || ''
+            };
+            
+            // Process template client-side
+            const output = this.actionManager.processTemplateClient(action.template, context);
+            
+            // Update action's last used timestamp
+            action.lastUsed = new Date().toISOString();
+            await this.actionManager.save(action);
+            
+            // Display result
+            this.showActionResult(action.name, output);
+            
+        } catch (error) {
+            console.error('Failed to execute custom action:', error);
+            this.ui.showToast('Failed to execute custom action', 'error');
+        }
+    };
+    
+    // Show action result in UI
+    window.whisperApp.showActionResult = function(actionName, output) {
+        const actionResults = document.getElementById('action-results');
+        const actionNameDisplay = document.getElementById('action-name-display');
+        const actionTimestampDisplay = document.getElementById('action-timestamp-display');
+        const actionOutputContent = document.getElementById('action-output-content');
+        
+        actionNameDisplay.textContent = actionName;
+        actionTimestampDisplay.textContent = 'Processed ' + new Date().toLocaleTimeString();
+        actionOutputContent.textContent = output;
+        
+        actionResults.classList.remove('hidden');
+        
+        // Scroll to action results
+        actionResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 }
 </script>
