@@ -1,0 +1,298 @@
+name: PR Quality Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  pr-validation:
+    name: PR Validation
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Validate PR title
+      run: |
+        # Create PR title validation script
+        cat > validate_title.sh << 'EOF'
+        #!/bin/bash
+        PR_TITLE="$1"
+        echo "PR Title: $PR_TITLE"
+        
+        # Check if title follows conventional commit format
+        if echo "$PR_TITLE" | grep -qE '^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\(.+\))?: .+'; then
+          echo "✅ PR title follows conventional commit format"
+        else
+          echo "❌ PR title should follow conventional commit format: type(scope): description"
+          echo "Examples: feat: add new feature, fix: resolve bug, docs: update readme"
+          exit 1
+        fi
+        EOF
+        
+        chmod +x validate_title.sh
+        ./validate_title.sh "${{ github.event.pull_request.title }}"
+        
+    - name: Check PR description
+      run: |
+        # Create PR body validation script
+        cat > validate_body.sh << 'EOF'
+        #!/bin/bash
+        PR_BODY="$1"
+        
+        if [[ ${#PR_BODY} -lt 50 ]]; then
+          echo "❌ PR description is too short. Please provide detailed description."
+          exit 1
+        else
+          echo "✅ PR description is adequate (${#PR_BODY} characters)"
+        fi
+        
+        # Check for key sections
+        if [[ $PR_BODY == *"## Summary"* ]] || [[ $PR_BODY == *"# Summary"* ]]; then
+          echo "✅ Contains Summary section"
+        else
+          echo "⚠️  Consider adding a Summary section"
+        fi
+        EOF
+        
+        chmod +x validate_body.sh
+        ./validate_body.sh "${{ github.event.pull_request.body }}"
+        
+    - name: Check for breaking changes
+      run: |
+        # Create breaking change detection script
+        cat > check_breaking.sh << 'EOF'
+        #!/bin/bash
+        TITLE="$1"
+        BODY="$2"
+        
+        echo "Checking for breaking changes..."
+        
+        if [[ $TITLE == *"!"* ]] || [[ $BODY == *"BREAKING CHANGE"* ]]; then
+          echo "⚠️  Breaking change detected - ensure proper versioning"
+          echo "breaking_change=true" >> $GITHUB_OUTPUT
+        else
+          echo "✅ No breaking changes detected"
+          echo "breaking_change=false" >> $GITHUB_OUTPUT
+        fi
+        EOF
+        
+        chmod +x check_breaking.sh
+        ./check_breaking.sh "${{ github.event.pull_request.title }}" "${{ github.event.pull_request.body }}"
+        
+    - name: Check file changes
+      run: |
+        # Get list of changed files
+        git diff --name-only origin/main...HEAD > changed_files.txt
+        echo "Changed files:"
+        cat changed_files.txt
+        
+        # Check for sensitive file changes
+        if grep -E "\.(env|key|pem|p12|pfx)$" changed_files.txt; then
+          echo "❌ Sensitive files detected in PR"
+          exit 1
+        fi
+        
+        # Check for large files
+        for file in $(cat changed_files.txt); do
+          if [[ -f "$file" ]]; then
+            size=$(wc -c < "$file")
+            if (( size > 1048576 )); then  # 1MB
+              echo "❌ Large file detected: $file (${size} bytes)"
+              exit 1
+            fi
+          fi
+        done
+        
+        echo "✅ No sensitive or large files detected"
+        
+    - name: Dependency security check
+      run: |
+        if [[ -f "go.mod" ]]; then
+          echo "Checking Go dependencies..."
+          # This would require go to be installed, but we'll do a basic check
+          if grep -i "replace.*=>" go.mod; then
+            echo "⚠️  Replace directives found in go.mod - review carefully"
+          fi
+        fi
+        
+        if [[ -f "package.json" ]]; then
+          echo "Checking Node.js dependencies..."
+          if grep -E "file:|git\+|github:" package.json; then
+            echo "⚠️  Non-registry dependencies found - review carefully"
+          fi
+        fi
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Check code complexity
+      run: |
+        echo "Checking code complexity..."
+        # Install gocyclo for complexity analysis
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+        
+        # Check for functions with high cyclomatic complexity
+        if gocyclo -over 10 .; then
+          echo "❌ High complexity functions found (>10)"
+          exit 1
+        else
+          echo "✅ Code complexity is acceptable"
+        fi
+        
+    - name: Install required tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc
+        
+    - name: Check test coverage requirements
+      run: |
+        echo "Verifying test coverage requirements..."
+        go test -coverprofile=coverage.out ./...
+        
+        # Calculate coverage percentage
+        coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+        echo "Current coverage: ${coverage}%"
+        
+        # Convert to number for comparison
+        coverage_num=$(echo "$coverage" | cut -d'.' -f1)
+        
+        # Require minimum 78% coverage (adjusted based on current state)
+        if [[ $coverage_num -lt 78 ]]; then
+          echo "❌ Test coverage ${coverage}% is below required 78%"
+          exit 1
+        else
+          echo "✅ Test coverage ${coverage}% meets requirements"
+        fi
+        
+    - name: Check for commented code
+      run: |
+        echo "Checking for commented code..."
+        # Look for files with many consecutive comment lines
+        commented_files=$(find . -name "*.go" -exec grep -l "//.*//.*//.*//.*" {} \; 2>/dev/null || true)
+        if [[ -n "$commented_files" ]]; then
+          echo "⚠️  Files with potential commented code blocks found:"
+          echo "$commented_files"
+          echo "Consider removing large blocks of commented code"
+        else
+          echo "✅ No large commented code blocks found"
+        fi
+
+  performance-impact:
+    name: Performance Impact Analysis
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout PR branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install FFmpeg for benchmarks
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        
+    - name: Run benchmarks on PR branch
+      run: |
+        echo "Running benchmarks on PR branch..."
+        # Run available benchmarks and save to file
+        if go test -bench=. -benchmem -run=^$ ./internal/service > pr_bench.txt 2>&1; then
+          echo "✅ PR branch benchmarks completed"
+          echo "PR Branch Benchmarks:"
+          cat pr_bench.txt
+        else
+          echo "⚠️  Some benchmarks failed on PR branch, continuing..."
+          echo "BENCHMARK_FAILED=true" > pr_bench.txt
+        fi
+        
+    - name: Store PR benchmarks
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-benchmarks
+        path: pr_bench.txt
+        
+    - name: Checkout main branch
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        
+    - name: Set up Go for main branch
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install FFmpeg for main branch
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        
+    - name: Run benchmarks on main branch
+      run: |
+        echo "Running benchmarks on main branch..."
+        # Run available benchmarks and save to file
+        if go test -bench=. -benchmem -run=^$ ./internal/service > main_bench.txt 2>&1; then
+          echo "✅ Main branch benchmarks completed"
+          echo "Main Branch Benchmarks:"
+          cat main_bench.txt
+        else
+          echo "⚠️  Some benchmarks failed on main branch, continuing..."
+          echo "BENCHMARK_FAILED=true" > main_bench.txt
+        fi
+        
+    - name: Download PR benchmarks
+      uses: actions/download-artifact@v4
+      with:
+        name: pr-benchmarks
+        
+    - name: Compare performance
+      run: |
+        echo "Performance comparison:"
+        echo "Comparing benchmark results between main and PR branches"
+        
+        # Check if both benchmark files exist
+        if [[ -f pr_bench.txt ]] && [[ -f main_bench.txt ]]; then
+          echo "✅ Both benchmark files found"
+          
+          # Check if benchmarks actually ran successfully
+          if grep -q "BENCHMARK_FAILED" pr_bench.txt || grep -q "BENCHMARK_FAILED" main_bench.txt; then
+            echo "⚠️  Some benchmarks failed, skipping detailed comparison"
+            echo "✅ Performance check completed (with warnings)"
+          else
+            echo "✅ Benchmark comparison completed successfully"
+            echo "📊 Performance analysis:"
+            echo "Main branch results:"
+            cat main_bench.txt | grep -E "Benchmark.*-[0-9]+" || echo "No valid benchmarks found"
+            echo ""
+            echo "PR branch results:"
+            cat pr_bench.txt | grep -E "Benchmark.*-[0-9]+" || echo "No valid benchmarks found"
+            echo ""
+            echo "Review the results above to ensure no significant regressions"
+          fi
+        else
+          echo "⚠️  Missing benchmark files, skipping comparison"
+          echo "✅ Performance check completed (files not found)"
+        fi

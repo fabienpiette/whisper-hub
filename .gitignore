@@ -30,8 +30,17 @@ __pycache__/
 # Temporary files
 tmp/
 temp/
+*.out
+
+# Development artifacts
+coverage/
+coverage.html
+coverage*.out
+benchmarks/
+logs/
 
 # Claude Code project files
 CLAUDE.md
 .claude/node_modules/
 package-lock.json
+node_modules/

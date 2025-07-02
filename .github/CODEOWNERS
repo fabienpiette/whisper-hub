@@ -1,0 +1,31 @@
+# Code Owners for Whisper Hub
+
+# Global ownership - these users/teams will be requested for review on all PRs
+* @fabienpiette
+
+# Critical system files require additional review
+go.mod @fabienpiette
+go.sum @fabienpiette
+Dockerfile @fabienpiette
+docker-compose.yml @fabienpiette
+
+# Security-sensitive areas
+/internal/middleware/ @fabienpiette
+/internal/validation/ @fabienpiette
+/web/static/js/security.js @fabienpiette
+
+# Core business logic
+/internal/service/ @fabienpiette
+/internal/handler/ @fabienpiette
+
+# CI/CD and deployment
+/.github/ @fabienpiette
+/DEPLOYMENT.md @fabienpiette
+
+# Configuration files
+/.github/workflows/ @fabienpiette
+/package.json @fabienpiette
+
+# Documentation (can be more permissive in future)
+*.md @fabienpiette
+/docs/ @fabienpiette

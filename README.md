@@ -32,9 +32,10 @@ Privacy-first self-hosted web-based audio transcription using OpenAI's Whisper A
 - **GDPR/CCPA compliance** with data portability
 
 **🎬 Advanced Media Processing:**
-- **Advanced video conversion** with FFmpeg optimization
+- **Intelligent video conversion** with adaptive bitrate optimization
+- **Duration-aware processing** automatically adjusts quality vs. file size
 - **Smart error handling** with actionable user guidance
-- **Optimized for OpenAI limits** (automatic MP3 conversion)
+- **Optimized for OpenAI limits** (automatic MP3 conversion under 25MB)
 - **File validation** with corruption detection
 
 **📊 Privacy & Data Management:**
@@ -146,18 +147,21 @@ Ideal for:
 
 ## 🎬 Video Processing Features
 
-**Automatic Optimization:**
+**Intelligent Optimization:**
 - ✅ **Smart format detection** and validation
-- ✅ **Efficient MP3 conversion** (70% smaller than WAV)
-- ✅ **Pre-validation** for file integrity
+- ✅ **Adaptive bitrate conversion** based on video duration
+- ✅ **Pre-conversion size estimation** prevents API errors
+- ✅ **Dynamic quality adjustment** (64kbps → 32kbps → 24kbps)
 - ✅ **Size limit compliance** (OpenAI 25MB limit)
 - ✅ **Progress tracking** that matches actual processing steps
 
 **Technical Details:**
-- **Audio extraction**: 16kHz mono, 64kbps MP3
+- **Audio extraction**: 16kHz mono, adaptive bitrate MP3
+- **Bitrate selection**: 64kbps (≤1hr), 32kbps (1-2hr), 24kbps+ (2hr+)
+- **Duration detection**: Uses ffprobe for precise video length analysis
 - **Container support**: Includes FFmpeg with MP3 LAME encoder
 - **Error handling**: Detailed feedback for corruption, size, and format issues
-- **Performance**: ~0.5MB per minute of converted audio
+- **Performance**: Optimized file sizes while maintaining speech quality
 
 ## 🔧 Configuration
 
@@ -192,6 +196,31 @@ Ideal for:
 - This is automatically handled by CORS middleware
 - If issues persist, try accessing via `localhost` instead of IP address
 - Clear browser cache and reload the page
+
+## 🔧 Development Scripts
+
+The project includes organized scripts for development, CI/CD, and quality assurance:
+
+```bash
+# Setup development environment
+./scripts/dev/setup.sh
+
+# Run comprehensive test coverage analysis
+./scripts/dev/test-coverage.sh
+
+# Run performance benchmarks
+./scripts/dev/run-benchmarks.sh
+
+# Validate code quality and complexity
+./scripts/qa/validate-code-quality.sh
+```
+
+**Script Organization:**
+- `scripts/ci/` - Continuous integration scripts (PR validation)
+- `scripts/dev/` - Development utilities (testing, benchmarks, setup)
+- `scripts/qa/` - Quality assurance tools (code analysis, validation)
+
+See `scripts/README.md` for detailed documentation.
 
 ### Debug Commands
 
