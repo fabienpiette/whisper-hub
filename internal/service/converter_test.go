@@ -1,9 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -756,6 +758,61 @@ func TestVideoConverter_ErrorMessageConsistency(t *testing.T) {
 			t.Error("Error chain doesn't end with a concrete error")
 		}
 	})
+}
+
+func TestVideoConverter_NewVideoConverterWithLogger(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	
+	converter := NewVideoConverterWithLogger(logger)
+	if converter == nil {
+		t.Error("Expected non-nil converter")
+	}
+	if converter.logger != logger {
+		t.Error("Expected logger to be set")
+	}
+}
+
+func TestVideoConverter_analyzeVideo(t *testing.T) {
+	converter := NewVideoConverter()
+	ctx := context.Background()
+	
+	// Test with non-existent file - should fail at validation
+	_, err := converter.analyzeVideo(ctx, "/nonexistent/file.mp4")
+	if err == nil {
+		t.Error("Expected error for non-existent file")
+	}
+}
+
+func TestVideoConverter_validateInput(t *testing.T) {
+	converter := NewVideoConverter()
+	
+	// Test with non-existent file
+	err := converter.validateInput("/nonexistent/file.mp4")
+	if err == nil {
+		t.Error("Expected error for non-existent file")
+	}
+}
+
+func TestVideoConverter_generateAudioPathEdgeCases(t *testing.T) {
+	converter := NewVideoConverter()
+	
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/tmp/video.mp4", "/tmp/video_converted.mp3"},
+		{"/path/to/movie.avi", "/path/to/movie_converted.mp3"},
+		{"video.mkv", "video_converted.mp3"},
+		{"/path/file.with.dots.mp4", "/path/file.with.dots_converted.mp3"},
+	}
+	
+	for _, tt := range tests {
+		result := converter.generateAudioPath(tt.input)
+		if result != tt.expected {
+			t.Errorf("generateAudioPath(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
 }
 
 // Note: Testing actual video conversion would require ffmpeg to be installed
