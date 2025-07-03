@@ -115,6 +115,14 @@ class WhisperApp {
             this.actionManager.showManageModal();
         });
         
+        // Post-action selector change
+        document.getElementById('post-action-selector')?.addEventListener('change', (e) => {
+            const hiddenInput = document.getElementById('post-action-input');
+            if (hiddenInput) {
+                hiddenInput.value = e.target.value;
+            }
+        });
+        
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             this.handleKeyboardShortcuts(e);
@@ -462,6 +470,89 @@ class WhisperApp {
             console.error('Failed to copy:', error);
             this.ui.showToast('Failed to copy', 'error');
         }
+    }
+    
+    // Global methods for copy functionality from templates
+    copyResult(button) {
+        try {
+            const resultCard = button.closest('.result-card');
+            if (resultCard) {
+                const transcript = resultCard.dataset.transcript;
+                if (transcript) {
+                    navigator.clipboard.writeText(transcript);
+                    this.ui.showToast('Original transcript copied!', 'success');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to copy result:', error);
+            this.ui.showToast('Failed to copy', 'error');
+        }
+    }
+    
+    copyActionResult(button) {
+        try {
+            const actionContent = document.getElementById('action-result-text');
+            if (actionContent) {
+                navigator.clipboard.writeText(actionContent.textContent);
+                this.ui.showToast('AI result copied!', 'success');
+            }
+        } catch (error) {
+            console.error('Failed to copy action result:', error);
+            this.ui.showToast('Failed to copy', 'error');
+        }
+    }
+    
+    downloadResult(button) {
+        try {
+            const resultCard = button.closest('.result-card');
+            if (resultCard) {
+                const transcript = resultCard.dataset.transcript;
+                const filename = resultCard.dataset.filename;
+                const actionContent = document.getElementById('action-result-text');
+                
+                let content = `Transcript from: ${filename}\nDate: ${new Date().toLocaleString()}\n\n`;
+                content += `ORIGINAL TRANSCRIPT:\n${transcript}\n\n`;
+                
+                if (actionContent) {
+                    content += `AI PROCESSING RESULT:\n${actionContent.textContent}\n`;
+                }
+                
+                const downloadFilename = `${filename.replace(/\.[^/.]+$/, '')}_processed.txt`;
+                this.downloadFile(content, downloadFilename, 'text/plain');
+                this.ui.showToast('Download started!', 'success');
+            }
+        } catch (error) {
+            console.error('Failed to download result:', error);
+            this.ui.showToast('Failed to download', 'error');
+        }
+    }
+    
+    selectText(elementId) {
+        try {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        } catch (error) {
+            console.error('Failed to select text:', error);
+        }
+    }
+    
+    startNewTranscription() {
+        // Reset the form and scroll to top
+        document.getElementById('transcribe-form').reset();
+        document.getElementById('file-preview').classList.add('hidden');
+        document.getElementById('transcribe-btn').disabled = true;
+        document.getElementById('result-container').classList.add('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    viewHistory() {
+        this.togglePanel('history');
     }
     
     async downloadTranscript(entryId) {
@@ -1043,6 +1134,67 @@ class CustomActionManager {
             'date': 'Current date',
             'time': 'Current time'
         };
+        this.availableModels = [
+            'gpt-3.5-turbo',
+            'gpt-3.5-turbo-16k',
+            'gpt-4',
+            'gpt-4-turbo-preview',
+            'gpt-4-turbo',
+            'gpt-4o',
+            'gpt-4o-mini'
+        ];
+        this.predefinedActions = [
+            {
+                id: 'openai-meeting-summary',
+                name: 'Smart Meeting Summary',
+                description: 'AI-powered comprehensive meeting summary with key decisions and action items',
+                type: 'openai',
+                prompt: 'Analyze this meeting transcript and create a comprehensive summary with the following sections:\n\n1. **Key Decisions Made**\n2. **Action Items** (with responsible parties if mentioned)\n3. **Important Discussion Points**\n4. **Next Steps**\n\nFormat the output with clear headings and bullet points for easy reading.',
+                model: 'gpt-3.5-turbo',
+                temperature: 0.3,
+                maxTokens: 1500
+            },
+            {
+                id: 'openai-action-items',
+                name: 'Action Items Extractor',
+                description: 'Extract and organize all action items, tasks, and assignments',
+                type: 'openai',
+                prompt: 'Extract all action items, tasks, deadlines, and assignments from this transcript. For each item, identify:\n\n- The specific task or action required\n- Who is responsible (if mentioned)\n- Any deadlines or timeframes mentioned\n- Priority level (if indicated)\n\nFormat as a prioritized task list with checkboxes.',
+                model: 'gpt-3.5-turbo',
+                temperature: 0.2,
+                maxTokens: 1000
+            },
+            {
+                id: 'openai-executive-brief',
+                name: 'Executive Brief',
+                description: 'Concise executive summary for leadership review',
+                type: 'openai',
+                prompt: 'Create a concise executive summary of this transcript suitable for leadership review. Focus on:\n\n- Strategic decisions and their business impact\n- Financial implications or budget discussions\n- Risk factors or opportunities identified\n- Key performance metrics or outcomes\n- Critical next steps requiring leadership attention\n\nKeep it under 300 words and use business-appropriate language.',
+                model: 'gpt-4',
+                temperature: 0.2,
+                maxTokens: 800
+            },
+            {
+                id: 'openai-key-insights',
+                name: 'Key Insights',
+                description: 'Identify important insights, conclusions, and strategic points',
+                type: 'openai',
+                prompt: 'Identify and extract the most important insights, conclusions, and strategic points from this transcript. Focus on:\n\n- Novel ideas or innovative solutions discussed\n- Important data points or metrics mentioned\n- Strategic implications for the business\n- Risk factors or challenges identified\n- Opportunities for improvement or growth\n\nPresent as numbered insights with brief explanations.',
+                model: 'gpt-3.5-turbo',
+                temperature: 0.4,
+                maxTokens: 1200
+            },
+            {
+                id: 'openai-qa-format',
+                name: 'Q&A Generator',
+                description: 'Convert transcript into structured question and answer format',
+                type: 'openai',
+                prompt: 'Convert this transcript into a comprehensive Q&A format that captures all important questions asked and answers provided. Include:\n\n- All direct questions and their answers\n- Implied questions from the discussion\n- Key topics addressed even if not explicitly asked\n\nFormat with clear Q: and A: markers for easy reading.',
+                model: 'gpt-3.5-turbo',
+                temperature: 0.3,
+                maxTokens: 2000
+            }
+        ];
     }
     
     getOrCreateEncryptionKey() {
@@ -1112,16 +1264,43 @@ class CustomActionManager {
             errors.push('Action name too long (max 100 characters)');
         }
         
-        if (!action.template || action.template.trim() === '') {
-            errors.push('Action template is required');
-        }
-        
-        if (action.template && action.template.length > 10000) {
-            errors.push('Action template too long (max 10000 characters)');
-        }
-        
         if (action.description && action.description.length > 500) {
             errors.push('Action description too long (max 500 characters)');
+        }
+        
+        // Validate based on action type
+        const actionType = action.type || 'template';
+        
+        if (actionType === 'template') {
+            if (!action.template || action.template.trim() === '') {
+                errors.push('Action template is required');
+            }
+            
+            if (action.template && action.template.length > 10000) {
+                errors.push('Action template too long (max 10000 characters)');
+            }
+        } else if (actionType === 'openai') {
+            if (!action.prompt || action.prompt.trim() === '') {
+                errors.push('Action prompt is required');
+            }
+            
+            if (action.prompt && action.prompt.length > 5000) {
+                errors.push('Action prompt too long (max 5000 characters)');
+            }
+            
+            if (action.model && !this.availableModels.includes(action.model)) {
+                errors.push(`Invalid OpenAI model: ${action.model}`);
+            }
+            
+            if (action.temperature !== undefined && (action.temperature < 0 || action.temperature > 2)) {
+                errors.push('Temperature must be between 0 and 2');
+            }
+            
+            if (action.maxTokens !== undefined && (action.maxTokens < 0 || action.maxTokens > 4000)) {
+                errors.push('Max tokens must be between 0 and 4000');
+            }
+        } else {
+            errors.push(`Invalid action type: ${actionType}`);
         }
         
         return errors;
@@ -1155,6 +1334,18 @@ class CustomActionManager {
     }
     
     createActionModalHTML(action, isEdit) {
+        // Fallback escapeHtml function if SecurityUtils is not available
+        const escapeHtml = (text) => {
+            if (window.SecurityUtils && window.SecurityUtils.escapeHtml) {
+                return window.SecurityUtils.escapeHtml(text);
+            }
+            // Simple fallback
+            if (typeof text !== 'string') return text;
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        
         const exampleTemplates = [
             {
                 name: 'Meeting Summary',
@@ -1197,14 +1388,14 @@ type: {{.FileType}}
             <div class="action-modal-content">
                 <div class="form-group">
                     <label for="action-name">Action Name *</label>
-                    <input type="text" id="action-name" value="${SecurityUtils.escapeHtml(action.name)}" 
+                    <input type="text" id="action-name" value="${escapeHtml(action.name)}" 
                            placeholder="e.g., Meeting Summary" maxlength="100">
                 </div>
                 
                 <div class="form-group">
                     <label for="action-description">Description</label>
                     <textarea id="action-description" placeholder="Brief description of what this action does" 
-                              maxlength="500">${SecurityUtils.escapeHtml(action.description)}</textarea>
+                              maxlength="500">${escapeHtml(action.description)}</textarea>
                 </div>
                 
                 <div class="form-group">
@@ -1231,15 +1422,15 @@ type: {{.FileType}}
                         </details>
                     </div>
                     <textarea id="action-template" placeholder="Enter your template using {{.Variable}} syntax" 
-                              rows="8" maxlength="10000">${SecurityUtils.escapeHtml(action.template)}</textarea>
+                              rows="8" maxlength="10000">${escapeHtml(action.template)}</textarea>
                 </div>
                 
                 <div class="form-group">
                     <label>Example Templates:</label>
                     <div class="example-templates">
                         ${exampleTemplates.map((example, index) => `
-                            <button type="button" class="example-btn" data-template="${SecurityUtils.escapeHtml(example.template)}">
-                                ${SecurityUtils.escapeHtml(example.name)}
+                            <button type="button" class="example-btn" data-template="${escapeHtml(example.template)}">
+                                ${escapeHtml(example.name)}
                             </button>
                         `).join('')}
                     </div>
@@ -1322,11 +1513,22 @@ type: {{.FileType}}
     }
     
     showPreviewModal(content) {
+        // Fallback escapeHtml function
+        const escapeHtml = (text) => {
+            if (window.SecurityUtils && window.SecurityUtils.escapeHtml) {
+                return window.SecurityUtils.escapeHtml(text);
+            }
+            if (typeof text !== 'string') return text;
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        
         const previewHtml = `
             <div class="preview-content">
                 <h4>Template Preview</h4>
                 <div class="preview-output">
-                    <pre>${SecurityUtils.escapeHtml(content)}</pre>
+                    <pre>${escapeHtml(content)}</pre>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn primary" onclick="this.closest('.modal-overlay').remove()">Close Preview</button>
@@ -1377,6 +1579,17 @@ type: {{.FileType}}
     }
     
     createManageModalHTML(actions) {
+        // Fallback escapeHtml function
+        const escapeHtml = (text) => {
+            if (window.SecurityUtils && window.SecurityUtils.escapeHtml) {
+                return window.SecurityUtils.escapeHtml(text);
+            }
+            if (typeof text !== 'string') return text;
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        
         if (actions.length === 0) {
             return `
                 <div class="manage-content">
@@ -1394,8 +1607,8 @@ type: {{.FileType}}
                     ${actions.map(action => `
                         <div class="action-item" data-id="${action.id}">
                             <div class="action-info">
-                                <h4>${SecurityUtils.escapeHtml(action.name)}</h4>
-                                <p>${SecurityUtils.escapeHtml(action.description || 'No description')}</p>
+                                <h4>${escapeHtml(action.name)}</h4>
+                                <p>${escapeHtml(action.description || 'No description')}</p>
                                 <div class="action-meta">
                                     <span>Created: ${new Date(action.created).toLocaleDateString()}</span>
                                     ${action.lastUsed ? `<span>Last used: ${new Date(action.lastUsed).toLocaleDateString()}</span>` : ''}
@@ -1527,19 +1740,44 @@ type: {{.FileType}}
         const selector = document.getElementById('post-action-selector');
         if (!selector) return;
         
-        const actions = await this.load();
+        const customActions = await this.load();
         
         // Clear existing options except the first one
         while (selector.children.length > 1) {
             selector.removeChild(selector.lastChild);
         }
         
-        actions.forEach(action => {
-            const option = document.createElement('option');
-            option.value = action.id;
-            option.textContent = action.name;
-            selector.appendChild(option);
-        });
+        // Add predefined OpenAI actions
+        if (this.predefinedActions && this.predefinedActions.length > 0) {
+            const predefinedGroup = document.createElement('optgroup');
+            predefinedGroup.label = '🤖 AI-Powered Actions';
+            
+            this.predefinedActions.forEach(action => {
+                const option = document.createElement('option');
+                option.value = action.id;
+                option.textContent = action.name;
+                option.title = action.description;
+                predefinedGroup.appendChild(option);
+            });
+            
+            selector.appendChild(predefinedGroup);
+        }
+        
+        // Add custom actions if any exist
+        if (customActions.length > 0) {
+            const customGroup = document.createElement('optgroup');
+            customGroup.label = '✨ Custom Actions';
+            
+            customActions.forEach(action => {
+                const option = document.createElement('option');
+                option.value = action.id;
+                option.textContent = `${action.name} (${action.type || 'template'})`;
+                option.title = action.description || '';
+                customGroup.appendChild(option);
+            });
+            
+            selector.appendChild(customGroup);
+        }
     }
     
     showModal(content, title) {
@@ -1548,11 +1786,22 @@ type: {{.FileType}}
             existing.remove();
         }
         
+        // Fallback escapeHtml function
+        const escapeHtml = (text) => {
+            if (window.SecurityUtils && window.SecurityUtils.escapeHtml) {
+                return window.SecurityUtils.escapeHtml(text);
+            }
+            if (typeof text !== 'string') return text;
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        
         const modalHtml = `
             <div class="modal-overlay">
                 <div class="modal-dialog">
                     <div class="modal-header">
-                        <h3>${SecurityUtils.escapeHtml(title)}</h3>
+                        <h3>${escapeHtml(title)}</h3>
                         <button type="button" class="modal-close">&times;</button>
                     </div>
                     <div class="modal-body">

@@ -35,6 +35,7 @@ type TranscriptData struct {
 	DurationFormatted       string
 	ProcessingTimeFormatted string
 	IncognitoMode           bool
+	ActionResult            interface{} // For custom action results
 }
 
 // Writer handles HTTP response writing
@@ -78,6 +79,37 @@ func (w *Writer) WriteLoading(rw http.ResponseWriter) {
 // WriteTranscriptionResult writes a successful transcription result
 func (w *Writer) WriteTranscriptionResult(rw http.ResponseWriter, transcription, filename string) {
 	w.WriteTranscriptionResultWithMetadata(rw, transcription, filename, nil)
+}
+
+// WriteTranscriptionResultWithAction writes a successful transcription result with action result
+func (w *Writer) WriteTranscriptionResultWithAction(rw http.ResponseWriter, transcription, filename string, metadata *HistoryMetadata, actionResult interface{}) {
+	rw.Header().Set(constants.HeaderContentType, constants.ContentTypeHTML)
+
+	// Create transcript data with all necessary information
+	data := &TranscriptData{
+		Transcript:     transcription,
+		Filename:       filename,
+		CharacterCount: len(transcription),
+		WordCount:      w.countWords(transcription),
+		IncognitoMode:  false, // TODO: Get from request context
+		ActionResult:   actionResult,
+	}
+
+	if metadata != nil {
+		data.FileType = metadata.FileType
+		data.FileSize = metadata.FileSize
+		data.Duration = metadata.Duration
+	}
+
+	// Format helper data
+	data.FileSizeFormatted = w.formatFileSize(data.FileSize)
+	if data.Duration != nil {
+		data.DurationFormatted = w.formatDuration(*data.Duration)
+	}
+	data.EstimatedReadingTime = w.estimateReadingTime(data.WordCount)
+
+	// Render result template with action result
+	w.renderResultTemplateWithAction(rw, data, metadata)
 }
 
 // WriteTranscriptionResultWithMetadata writes a successful transcription result with history metadata
@@ -228,6 +260,181 @@ func (w *Writer) renderResultTemplate(rw http.ResponseWriter, data *TranscriptDa
 		data.CharacterCount,
 		data.EstimatedReadingTime,
 	)
+}
+
+// renderResultTemplateWithAction renders the result template with action result
+func (w *Writer) renderResultTemplateWithAction(rw http.ResponseWriter, data *TranscriptData, metadata *HistoryMetadata) {
+	// Include history metadata as JSON in data attribute for client-side processing
+	metadataJSON := ""
+	if metadata != nil {
+		metadataJSON = fmt.Sprintf(`{"id":"%s","timestamp":"%s","file_type":"%s","file_size":%d}`,
+			template.JSEscapeString(metadata.ID),
+			metadata.Timestamp.Format(time.RFC3339),
+			template.JSEscapeString(metadata.FileType),
+			metadata.FileSize,
+		)
+	}
+
+	// Check if we have action result
+	hasActionResult := data.ActionResult != nil
+	var actionHTML string
+	
+	if hasActionResult {
+		actionHTML = w.renderActionResult(data.ActionResult)
+	}
+
+	// Enhanced result template with dual-pane layout for action results
+	if hasActionResult {
+		fmt.Fprintf(rw, `
+		<div class="result-card dual-pane" 
+			 data-transcript="%s"
+			 data-filename="%s"
+			 data-file-type="%s"
+			 data-file-size="%d"
+			 data-character-count="%d"
+			 data-history-metadata="%s">
+			
+			<!-- Result Header -->
+			<div class="result-header">
+				<div class="result-status">
+					<div class="status-icon">✅</div>
+					<h3 class="result-title">Transcription Complete with AI Processing</h3>
+				</div>
+				<div class="result-actions">
+					<button class="action-btn copy-btn" onclick="whisperApp.copyResult(this)" title="Copy Transcript">
+						<span class="btn-icon">📋</span>
+						<span class="btn-text">Copy Original</span>
+					</button>
+					<button class="action-btn copy-btn" onclick="whisperApp.copyActionResult(this)" title="Copy AI Result">
+						<span class="btn-icon">🤖</span>
+						<span class="btn-text">Copy AI Result</span>
+					</button>
+					<button class="action-btn download-btn" onclick="whisperApp.downloadResult(this)" title="Download Both">
+						<span class="btn-icon">💾</span>
+						<span class="btn-text">Download</span>
+					</button>
+				</div>
+			</div>
+
+			<!-- File Information -->
+			<div class="file-info-card">
+				<div class="file-details">
+					<div class="file-primary">
+						<div class="file-icon">%s</div>
+						<div class="file-name">%s</div>
+					</div>
+					<div class="file-metadata">
+						<div class="meta-item">
+							<span class="meta-label">Type:</span>
+							<span class="meta-value">%s</span>
+						</div>
+						<div class="meta-item">
+							<span class="meta-label">Size:</span>
+							<span class="meta-value">%s</span>
+						</div>
+						<div class="meta-item">
+							<span class="meta-label">Characters:</span>
+							<span class="meta-value">%d</span>
+						</div>
+						<div class="meta-item">
+							<span class="meta-label">Words:</span>
+							<span class="meta-value">%d</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Dual Content Layout -->
+			<div class="dual-content-layout">
+				<!-- Original Transcript -->
+				<div class="content-pane original-pane">
+					<div class="pane-header">
+						<h4 class="pane-title">📝 Original Transcript</h4>
+						<div class="pane-tools">
+							<button class="tool-btn" onclick="whisperApp.selectText('transcript-text')" title="Select All">📝</button>
+						</div>
+					</div>
+					
+					<div class="transcript-content" id="transcript-text">%s</div>
+					
+					<div class="pane-footer">
+						<div class="word-stats">
+							<span class="stat">%d words</span>
+							<span class="stat">%d characters</span>
+							<span class="stat">~%s reading</span>
+						</div>
+					</div>
+				</div>
+
+				<!-- AI Processing Result -->
+				<div class="content-pane action-pane">
+					%s
+				</div>
+			</div>
+
+			<!-- Quick Actions -->
+			<div class="quick-actions">
+				<button class="action-btn secondary" onclick="whisperApp.startNewTranscription()">
+					<span class="btn-icon">🎵</span>
+					<span class="btn-text">Transcribe Another File</span>
+				</button>
+				<button class="action-btn secondary" onclick="whisperApp.viewHistory()">
+					<span class="btn-icon">📚</span>
+					<span class="btn-text">View History</span>
+				</button>
+			</div>
+		</div>`,
+			template.HTMLEscapeString(data.Transcript),
+			template.HTMLEscapeString(data.Filename),
+			template.HTMLEscapeString(data.FileType),
+			data.FileSize,
+			data.CharacterCount,
+			template.HTMLEscapeString(metadataJSON),
+			w.getFileIcon(data.FileType),
+			template.HTMLEscapeString(data.Filename),
+			strings.Title(data.FileType),
+			data.FileSizeFormatted,
+			data.CharacterCount,
+			data.WordCount,
+			template.HTMLEscapeString(data.Transcript),
+			data.WordCount,
+			data.CharacterCount,
+			data.EstimatedReadingTime,
+			actionHTML,
+		)
+	} else {
+		// Use the existing single-pane layout
+		w.renderResultTemplate(rw, data, metadata)
+	}
+}
+
+// renderActionResult renders the action processing result
+func (w *Writer) renderActionResult(actionResult interface{}) string {
+	// Use reflection to access fields since we can't import service package
+	v := fmt.Sprintf("%+v", actionResult)
+	
+	// For now, return a simple representation - this can be enhanced later
+	// In production, you'd want to create a proper interface or use a different approach
+	return fmt.Sprintf(`
+		<div class="pane-header">
+			<h4 class="pane-title">🤖 AI Processing Result</h4>
+			<div class="pane-tools">
+				<button class="tool-btn" onclick="whisperApp.selectText('action-result-text')" title="Select All">📝</button>
+			</div>
+		</div>
+		
+		<div class="action-content success" id="action-result-text">
+			<div class="result-placeholder">
+				<p>AI processing completed successfully.</p>
+				<p>Result data: %s</p>
+			</div>
+		</div>
+		
+		<div class="pane-footer">
+			<div class="action-stats">
+				<span class="stat">Processing Complete</span>
+			</div>
+		</div>`, template.HTMLEscapeString(v))
 }
 
 // Helper functions

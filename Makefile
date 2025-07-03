@@ -1,4 +1,4 @@
-.PHONY: help build run clean test test-coverage test-frontend test-critical docker-build docker-run docker-compose-up docker-compose-down setup deps ci ci-backend ci-frontend ci-security ci-docker vet fmt lint check-fmt install-tools
+.PHONY: help build run clean test test-coverage test-frontend test-critical test-integration test-e2e test-performance test-security test-config test-all docker-build docker-run docker-compose-up docker-compose-down setup deps ci ci-backend ci-frontend ci-security ci-docker vet fmt lint check-fmt install-tools
 
 help: ## Show this help
 	@echo "Available commands:"
@@ -28,11 +28,79 @@ test-frontend: ## Run all frontend tests
 test-critical: ## Run critical frontend tests only
 	npm run test:critical
 
-test-security: ## Run security tests (allow failures)
-	npm run test:security || echo "⚠️  Security tests need attention"
+test-integration: ## Run OpenAI integration tests with mocking
+	@echo "Running OpenAI integration tests..."
+	go test -v ./test/openai_integration_test.go -run "TestOpenAIIntegration"
+	@echo "✅ Integration tests completed"
 
-test-performance: ## Run performance tests (allow failures)
-	npm run test:performance || echo "⚠️  Performance tests need review"
+test-e2e: ## Run end-to-end workflow tests
+	@echo "Running end-to-end workflow tests..."
+	npx jest test/e2e_workflow_test.js --verbose
+	@echo "✅ E2E tests completed"
+
+test-performance: ## Run performance and load tests
+	@echo "Running performance and load tests..."
+	npx jest test/performance_load_test.js --verbose
+	@echo "✅ Performance tests completed"
+
+test-security: ## Run security validation tests
+	@echo "Running security validation tests..."
+	npx jest test/security_validation_test.js --verbose
+	@echo "✅ Security tests completed"
+
+test-config: ## Run configuration and environment tests
+	@echo "Running configuration tests..."
+	go test -v ./internal/config/post_actions_test.go
+	@echo "✅ Configuration tests completed"
+
+test-error-handling: ## Run error handling and edge case tests
+	@echo "Running error handling tests..."
+	npx jest test/error_handling_edge_cases_test.js --verbose
+	@echo "✅ Error handling tests completed"
+
+test-post-actions: ## Run comprehensive post-action service tests
+	@echo "Running post-action service tests..."
+	go test -v ./internal/service/post_action_test.go
+	@echo "✅ Post-action service tests completed"
+
+test-security-utils: ## Run SecurityUtils comprehensive tests
+	@echo "Running SecurityUtils tests..."
+	npx jest test/security_utils_test.js --verbose
+	@echo "✅ SecurityUtils tests completed"
+
+test-frontend-integration: ## Run frontend integration tests for fixed issues
+	@echo "Running frontend integration tests..."
+	npx jest test/frontend_integration_fixed_test.js --verbose
+	@echo "✅ Frontend integration tests completed"
+
+test-create-manage: ## Run Create/Manage button functionality tests
+	@echo "Running Create/Manage button tests..."
+	npx jest test/create_manage_buttons_test.js --verbose
+	@echo "✅ Create/Manage button tests completed"
+
+test-security-integration: ## Run SecurityUtils integration tests for the fix
+	@echo "Running SecurityUtils integration tests..."
+	npx jest test/security_utils_integration_test.js --verbose
+	@echo "✅ SecurityUtils integration tests completed"
+
+test-all: test test-critical test-integration test-e2e test-performance test-security test-config test-error-handling test-post-actions test-security-utils test-frontend-integration test-create-manage test-security-integration ## Run all test suites
+	@echo ""
+	@echo "🧪 Complete Test Suite Results:"
+	@echo "✅ Go unit tests passed"
+	@echo "✅ Critical frontend tests passed"
+	@echo "✅ OpenAI integration tests passed"
+	@echo "✅ End-to-end workflow tests passed"
+	@echo "✅ Performance tests passed"
+	@echo "✅ Security validation tests passed"
+	@echo "✅ Configuration tests passed"
+	@echo "✅ Error handling tests passed"
+	@echo "✅ Post-action service tests passed"
+	@echo "✅ SecurityUtils tests passed"
+	@echo "✅ Frontend integration tests passed"
+	@echo "✅ Create/Manage button tests passed"
+	@echo "✅ SecurityUtils integration tests passed"
+	@echo ""
+	@echo "🎉 All test suites completed successfully!"
 
 # Code Quality Commands
 vet: ## Run Go vet
@@ -112,7 +180,7 @@ docker-test: ## Test Docker build and health
 ci-backend: deps check-fmt vet test-coverage ## Run backend CI pipeline
 	@echo "✅ Backend CI pipeline completed"
 
-ci-frontend: deps-frontend test-critical ## Run frontend CI pipeline
+ci-frontend: deps-frontend test-critical test-security test-e2e ## Run frontend CI pipeline
 	@echo "✅ Frontend CI pipeline completed"
 
 ci-security: install-tools lint ## Run security checks
@@ -121,12 +189,17 @@ ci-security: install-tools lint ## Run security checks
 ci-docker: docker-test ## Run Docker CI pipeline
 	@echo "✅ Docker CI pipeline completed"
 
-ci: ci-backend ci-frontend ci-docker ## Run complete CI pipeline locally
+ci-qa: test-integration test-performance test-config test-error-handling test-post-actions test-security-utils test-frontend-integration test-create-manage ## Run QA test suite
+	@echo "✅ QA test suite completed"
+
+ci: ci-backend ci-frontend ci-security ci-docker ci-qa ## Run complete CI pipeline locally
 	@echo ""
 	@echo "🚀 Complete CI Pipeline Results:"
 	@echo "✅ Backend tests passed"
 	@echo "✅ Frontend tests passed"
+	@echo "✅ Security checks passed"
 	@echo "✅ Docker build passed"
+	@echo "✅ QA test suite passed"
 	@echo ""
 	@echo "🎉 All CI checks completed successfully!"
 

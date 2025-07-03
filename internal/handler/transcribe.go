@@ -37,8 +37,18 @@ type TranscribeHandler struct {
 }
 
 func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateService interfaces.TemplateService, metrics interfaces.MetricsTracker) *TranscribeHandler {
+	transcriber := service.NewTranscriber(cfg.OpenAIAPIKey)
+	var postActionService *service.PostActionService
+	
+	// Create post-action service with OpenAI client if enabled and API key is available
+	if cfg.PostActionsEnabled && cfg.OpenAIAPIKey != "" {
+		postActionService = service.NewPostActionService(logger, transcriber.GetClient())
+	} else {
+		postActionService = service.NewPostActionService(logger, nil)
+	}
+	
 	return &TranscribeHandler{
-		transcriber:       service.NewTranscriber(cfg.OpenAIAPIKey),
+		transcriber:       transcriber,
 		videoConverter:    service.NewVideoConverterWithLogger(logger),
 		tempManager:       storage.NewTempFileManager(cfg.TempDir),
 		validator:         validation.NewFileValidator(constants.MaxAudioFileSize),
@@ -48,7 +58,7 @@ func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateServi
 		logger:            logger,
 		metrics:           metrics,
 		security:          middleware.NewSecurityMiddleware(),
-		postActionService: service.NewPostActionService(logger),
+		postActionService: postActionService,
 	}
 }
 
@@ -110,18 +120,20 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Create history metadata for client-side storage
-	if h.config.HistoryEnabled {
-		metadata := &response.HistoryMetadata{
-			ID:        uuid.New().String(),
-			Timestamp: time.Now().UTC(),
-			FileType:  h.getFileType(header.Filename),
-			FileSize:  header.Size,
-			Duration:  h.calculateDuration(processingTime, len(transcription)),
-		}
-		// For now, use existing method and pass action data via template
+	metadata := &response.HistoryMetadata{
+		ID:        uuid.New().String(),
+		Timestamp: time.Now().UTC(),
+		FileType:  h.getFileType(header.Filename),
+		FileSize:  header.Size,
+		Duration:  h.calculateDuration(processingTime, len(transcription)),
+	}
+	
+	// Write result with action result if available
+	if actionResult != nil {
+		h.responseWriter.WriteTranscriptionResultWithAction(w, transcription, header.Filename, metadata, actionResult)
+	} else if h.config.HistoryEnabled {
 		h.responseWriter.WriteTranscriptionResultWithMetadata(w, transcription, header.Filename, metadata)
 	} else {
-		// For now, use existing method and pass action data via template  
 		h.responseWriter.WriteTranscriptionResult(w, transcription, header.Filename)
 	}
 }
@@ -216,10 +228,6 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 
 // processCustomAction handles processing of custom post-transcription actions
 func (h *TranscribeHandler) processCustomAction(actionID, transcription string, header *multipart.FileHeader, processingTime time.Duration) *service.ActionResult {
-	// Note: In a real implementation, custom actions would be stored server-side or retrieved from client
-	// For this implementation, we'll create a mock action structure that the frontend can process
-	// The actual action processing will be done client-side using the PostActionService structure
-	
 	h.logger.Info("processing custom action", "action_id", actionID, "filename", header.Filename)
 	
 	// Create action context
@@ -234,14 +242,42 @@ func (h *TranscribeHandler) processCustomAction(actionID, transcription string, 
 		ProcessingTime: h.formatProcessingTime(processingTime),
 	}
 	
-	// Return action metadata for client-side processing
-	// The actual template processing will happen in the frontend
-	return &service.ActionResult{
-		Success:     true,
-		ActionName:  "Custom Action", // This will be populated by frontend
-		ProcessedAt: time.Now(),
-		Output:      "", // Will be processed client-side
+	// Try to find predefined action first
+	action := h.findPredefinedAction(actionID)
+	if action == nil {
+		h.logger.Warn("action not found", "action_id", actionID)
+		return &service.ActionResult{
+			Success:     false,
+			Error:       "Action not found",
+			ActionName:  actionID,
+			ProcessedAt: time.Now(),
+		}
 	}
+	
+	// Process the action using the PostActionService
+	result := h.postActionService.ProcessAction(action, context)
+	
+	h.logger.Info("custom action processed",
+		"action_id", actionID,
+		"success", result.Success,
+		"output_length", len(result.Output),
+		"action_type", result.ActionType,
+	)
+	
+	return result
+}
+
+// findPredefinedAction looks up a predefined action by ID
+func (h *TranscribeHandler) findPredefinedAction(actionID string) *service.CustomAction {
+	predefinedActions := h.postActionService.GetPredefinedActions()
+	
+	for _, action := range predefinedActions {
+		if action.ID == actionID {
+			return &action
+		}
+	}
+	
+	return nil
 }
 
 func (h *TranscribeHandler) formatProcessingTime(duration time.Duration) string {

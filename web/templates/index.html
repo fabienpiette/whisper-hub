@@ -74,7 +74,8 @@
 
                 <!-- File Upload -->
                 <form id="transcribe-form" hx-post="/transcribe" hx-target="#result-container" hx-encoding="multipart/form-data">
-                    <input type="hidden" name="csrf_token" id="csrf-token" value="{{.CSRFToken}}">`
+                    <input type="hidden" name="csrf_token" id="csrf-token" value="{{.CSRFToken}}">
+                    <input type="hidden" name="post_action" id="post-action-input" value="">`
                     <div class="upload-zone" id="upload-zone">
                         <div class="upload-content">
                             <div class="upload-icon">📎</div>

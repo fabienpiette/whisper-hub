@@ -18,6 +18,19 @@ class SecurityUtils {
     }
     
     /**
+     * Escape HTML entities to prevent XSS
+     * @param {string} text - Text to escape
+     * @returns {string} - HTML-escaped text
+     */
+    static escapeHtml(text) {
+        if (typeof text !== 'string') return '';
+        
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    /**
      * Safely set innerHTML with XSS protection
      * @param {Element} element - Target element
      * @param {string} content - Content to set
