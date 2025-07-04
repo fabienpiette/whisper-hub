@@ -14,6 +14,7 @@ import (
 
 	"whisper-hub/internal/config"
 	"whisper-hub/internal/constants"
+	"whisper-hub/internal/service"
 )
 
 // mockTemplateService implements a mock template service for testing
@@ -504,5 +505,176 @@ func TestTranscribeHandler_processTranscription_VideoFileDetection(t *testing.T)
 	// Should fail at video conversion or transcription, not file saving
 	if strings.Contains(err.Error(), "failed to save") {
 		t.Errorf("unexpected file save error: %v", err)
+	}
+}
+
+func TestTranscribeHandler_formatProcessingTime(t *testing.T) {
+	handler := &TranscribeHandler{}
+	
+	tests := []struct {
+		name     string
+		duration time.Duration
+		expected string
+	}{
+		{
+			name:     "milliseconds",
+			duration: 500 * time.Millisecond,
+			expected: "500ms",
+		},
+		{
+			name:     "less than millisecond",
+			duration: 100 * time.Microsecond,
+			expected: "0ms",
+		},
+		{
+			name:     "seconds",
+			duration: 2500 * time.Millisecond,
+			expected: "2.5s",
+		},
+		{
+			name:     "multiple seconds",
+			duration: 5 * time.Second,
+			expected: "5.0s",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := handler.formatProcessingTime(tt.duration)
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTranscribeHandler_findPredefinedAction(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	postActionService := service.NewPostActionService(logger, nil)
+	
+	handler := &TranscribeHandler{
+		postActionService: postActionService,
+	}
+	
+	// Test finding an existing action
+	result := handler.findPredefinedAction("template-summary")
+	if result == nil {
+		t.Error("Expected to find predefined action 'template-summary'")
+	} else {
+		if result.ID != "template-summary" {
+			t.Errorf("Expected action ID 'template-summary', got %s", result.ID)
+		}
+	}
+	
+	// Test non-existent action
+	result = handler.findPredefinedAction("non-existent-action")
+	if result != nil {
+		t.Error("Expected nil for non-existent action")
+	}
+}
+
+func TestTranscribeHandler_processCustomAction(t *testing.T) {
+	cfg := &config.Config{OpenAIAPIKey: "test-key"}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	templateService := &mockTemplateService{}
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
+	
+	// Create mock file header
+	header := &multipart.FileHeader{
+		Filename: "test.mp3",
+		Size:     100,
+	}
+	
+	// Test processing a template action (doesn't require OpenAI)
+	result := handler.processCustomAction("template-summary", "This is a test transcript", header, time.Second)
+	
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+	
+	if !result.Success {
+		t.Errorf("Expected successful result, got error: %s", result.Error)
+	}
+	
+	if result.Output == "" {
+		t.Error("Expected non-empty output")
+	}
+}
+
+func TestTranscribeHandler_HandleTranscribe_AudioFileSuccess(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	cfg := &config.Config{
+		MaxUploadSize: 100 * 1024 * 1024, // 100MB
+		Port:          "8080",
+	}
+
+	templateService := &mockTemplateService{}
+	metricsTracker := &mockMetricsTracker{}
+	mockTranscriber := &mockTranscriber{shouldError: false}
+	mockVideoConverter := &mockVideoConverter{shouldError: false}
+	mockPostActionService := &mockPostActionService{}
+
+	handler := NewTranscribeHandler(cfg, logger, mockTranscriber, mockVideoConverter, templateService, metricsTracker, mockPostActionService)
+
+	// Create a multipart request with valid audio file
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("audio", "test.mp3")
+	part.Write([]byte("fake audio content"))
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/transcribe", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	handler.HandleTranscribe(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	// Check that response contains expected content
+	responseBody := w.Body.String()
+	if !strings.Contains(responseBody, "Mock transcription result") {
+		t.Error("Expected transcription result in response")
+	}
+}
+
+func TestTranscribeHandler_HandleTranscribe_VideoFileSuccess(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	cfg := &config.Config{
+		MaxUploadSize: 100 * 1024 * 1024, // 100MB
+		Port:          "8080",
+	}
+
+	templateService := &mockTemplateService{}
+	metricsTracker := &mockMetricsTracker{}
+	mockTranscriber := &mockTranscriber{shouldError: false}
+	mockVideoConverter := &mockVideoConverter{shouldError: false}
+	mockPostActionService := &mockPostActionService{}
+
+	handler := NewTranscribeHandler(cfg, logger, mockTranscriber, mockVideoConverter, templateService, metricsTracker, mockPostActionService)
+
+	// Create a multipart request with valid video file
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("audio", "test.mp4")
+	part.Write([]byte("fake video content"))
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/transcribe", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	handler.HandleTranscribe(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	// Check that response contains expected content
+	responseBody := w.Body.String()
+	if !strings.Contains(responseBody, "Mock transcription result") {
+		t.Error("Expected transcription result in response")
 	}
 }

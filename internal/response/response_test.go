@@ -280,3 +280,46 @@ func TestWriter_WriteJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestWriter_WriteTranscriptionResultWithAction(t *testing.T) {
+	writer := NewWriter()
+	rw := httptest.NewRecorder()
+
+	transcript := "Test transcript"
+	filename := "test.mp3"
+	metadata := &HistoryMetadata{
+		ID:        "test-id",
+		Timestamp: time.Now(),
+		FileType:  "audio",
+		FileSize:  1024,
+	}
+	actionResult := "Action result"
+
+	writer.WriteTranscriptionResultWithAction(rw, transcript, filename, metadata, actionResult)
+
+	if rw.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rw.Code)
+	}
+
+	body := rw.Body.String()
+	if !strings.Contains(body, transcript) {
+		t.Error("Response should contain transcript")
+	}
+	if !strings.Contains(body, filename) {
+		t.Error("Response should contain filename")
+	}
+}
+
+func TestWriter_renderActionResult(t *testing.T) {
+	writer := NewWriter()
+	
+	actionResult := "Test action result"
+	result := writer.renderActionResult(actionResult)
+
+	if !strings.Contains(result, actionResult) {
+		t.Error("Result should contain action result")
+	}
+	if !strings.Contains(result, "action-result") {
+		t.Error("Result should contain action-result class")
+	}
+}

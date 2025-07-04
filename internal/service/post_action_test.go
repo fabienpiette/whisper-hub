@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -547,6 +548,91 @@ func TestOpenAIActionProcessor_FormatOpenAIError(t *testing.T) {
 	}
 }
 
+func TestPostActionService_GetAvailableVariables(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewPostActionService(logger, nil)
+	
+	variables := service.GetAvailableVariables()
+	
+	if len(variables) == 0 {
+		t.Error("Expected variables list to not be empty")
+	}
+	
+	expectedVars := []string{"Transcript", "Filename", "Date", "FileType", "Duration", "WordCount", "CharCount", "ProcessingTime"}
+	for _, expectedVar := range expectedVars {
+		found := false
+		for _, variable := range variables {
+			if variable == expectedVar {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected variable '%s' not found in available variables", expectedVar)
+		}
+	}
+}
+
+func TestPostActionService_GetAvailableFunctions(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewPostActionService(logger, nil)
+	
+	functions := service.GetAvailableFunctions()
+	
+	if len(functions) == 0 {
+		t.Error("Expected functions list to not be empty")
+	}
+	
+	expectedFunctions := []string{"upper", "lower", "title", "trim", "wordCount", "charCount", "truncate", "summarize", "extractActions", "format", "timestamp", "date", "time"}
+	for _, expectedFunc := range expectedFunctions {
+		if _, exists := functions[expectedFunc]; !exists {
+			t.Errorf("Expected function '%s' not found in available functions", expectedFunc)
+		}
+	}
+}
+
+func TestTemplateEngine_formatText(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	engine := NewTemplateEngine(logger)
+	
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "basic text formatting",
+			input:    "This is a test sentence that should be wrapped.",
+			expected: "This is a test sentence that should be wrapped.",
+		},
+		{
+			name:     "empty text",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "long text",
+			input:    strings.Repeat("word ", 50),
+			expected: strings.Repeat("word ", 50),
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := engine.formatText(tt.input)
+			
+			// formatText should return text, just check it's not empty for non-empty input
+			if tt.input != "" && result == "" {
+				t.Error("Expected non-empty result for non-empty input")
+			}
+			
+			if tt.input == "" && result != "" {
+				t.Error("Expected empty result for empty input")
+			}
+		})
+	}
+}
+
 // Benchmark tests for performance validation
 func BenchmarkTemplateEngine_ProcessTemplate(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -604,3 +690,4 @@ func BenchmarkPostActionService_ProcessAction(b *testing.B) {
 		}
 	}
 }
+

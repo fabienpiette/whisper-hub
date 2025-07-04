@@ -158,3 +158,19 @@ func TestNewTranscriptionError(t *testing.T) {
 		t.Errorf("Expected underlying error %v, got %v", originalErr, err.Err)
 	}
 }
+
+func TestNewUploadError(t *testing.T) {
+	originalErr := errors.New("size limit exceeded")
+	err := NewUploadError(originalErr)
+
+	if err.Code != http.StatusBadRequest {
+		t.Errorf("Expected code %d, got %d", http.StatusBadRequest, err.Code)
+	}
+	expectedMsg := "file upload failed"
+	if err.Message != expectedMsg {
+		t.Errorf("Expected message %q, got %q", expectedMsg, err.Message)
+	}
+	if err.Err != originalErr {
+		t.Errorf("Expected underlying error %v, got %v", originalErr, err.Err)
+	}
+}
