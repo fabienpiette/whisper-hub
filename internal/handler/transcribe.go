@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	"whisper-hub/internal/config"
@@ -31,20 +33,32 @@ type TranscribeHandler struct {
 	logger          *slog.Logger
 	metrics         interfaces.MetricsTracker
 	security        *middleware.SecurityMiddleware
+	postActionService *service.PostActionService
 }
 
 func NewTranscribeHandler(cfg *config.Config, logger *slog.Logger, templateService interfaces.TemplateService, metrics interfaces.MetricsTracker) *TranscribeHandler {
+	transcriber := service.NewTranscriber(cfg.OpenAIAPIKey)
+	var postActionService *service.PostActionService
+	
+	// Create post-action service with OpenAI client if enabled and API key is available
+	if cfg.PostActionsEnabled && cfg.OpenAIAPIKey != "" {
+		postActionService = service.NewPostActionService(logger, transcriber.GetClient())
+	} else {
+		postActionService = service.NewPostActionService(logger, nil)
+	}
+	
 	return &TranscribeHandler{
-		transcriber:     service.NewTranscriber(cfg.OpenAIAPIKey),
-		videoConverter:  service.NewVideoConverterWithLogger(logger),
-		tempManager:     storage.NewTempFileManager(cfg.TempDir),
-		validator:       validation.NewFileValidator(constants.MaxAudioFileSize),
-		responseWriter:  response.NewWriter(),
-		templateService: templateService,
-		config:          cfg,
-		logger:          logger,
-		metrics:         metrics,
-		security:        middleware.NewSecurityMiddleware(),
+		transcriber:       transcriber,
+		videoConverter:    service.NewVideoConverterWithLogger(logger),
+		tempManager:       storage.NewTempFileManager(cfg.TempDir),
+		validator:         validation.NewFileValidator(constants.MaxAudioFileSize),
+		responseWriter:    response.NewWriter(),
+		templateService:   templateService,
+		config:            cfg,
+		logger:            logger,
+		metrics:           metrics,
+		security:          middleware.NewSecurityMiddleware(),
+		postActionService: postActionService,
 	}
 }
 
@@ -79,7 +93,7 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 	w.Header().Set(constants.HeaderContentType, constants.ContentTypeHTML)
 
 	// Parse and validate form
-	file, header, err := h.parseAndValidateForm(r)
+	file, header, postActionID, err := h.parseAndValidateForm(r)
 	if err != nil {
 		h.responseWriter.WriteError(w, err)
 		return
@@ -89,6 +103,7 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 	h.logger.Info("processing transcription request",
 		"filename", header.Filename,
 		"size", header.Size,
+		"post_action", postActionID,
 	)
 
 	// Save and process file
@@ -98,15 +113,25 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Process custom action if specified
+	var actionResult *service.ActionResult
+	if postActionID != "" {
+		actionResult = h.processCustomAction(postActionID, transcription, header, processingTime)
+	}
+
 	// Create history metadata for client-side storage
-	if h.config.HistoryEnabled {
-		metadata := &response.HistoryMetadata{
-			ID:        uuid.New().String(),
-			Timestamp: time.Now().UTC(),
-			FileType:  h.getFileType(header.Filename),
-			FileSize:  header.Size,
-			Duration:  h.calculateDuration(processingTime, len(transcription)),
-		}
+	metadata := &response.HistoryMetadata{
+		ID:        uuid.New().String(),
+		Timestamp: time.Now().UTC(),
+		FileType:  h.getFileType(header.Filename),
+		FileSize:  header.Size,
+		Duration:  h.calculateDuration(processingTime, len(transcription)),
+	}
+	
+	// Write result with action result if available
+	if actionResult != nil {
+		h.responseWriter.WriteTranscriptionResultWithAction(w, transcription, header.Filename, metadata, actionResult)
+	} else if h.config.HistoryEnabled {
 		h.responseWriter.WriteTranscriptionResultWithMetadata(w, transcription, header.Filename, metadata)
 	} else {
 		h.responseWriter.WriteTranscriptionResult(w, transcription, header.Filename)
@@ -114,12 +139,15 @@ func (h *TranscribeHandler) HandleTranscribe(w http.ResponseWriter, r *http.Requ
 }
 
 // parseAndValidateForm handles form parsing and validation
-func (h *TranscribeHandler) parseAndValidateForm(r *http.Request) (file multipart.File, header *multipart.FileHeader, err error) {
+func (h *TranscribeHandler) parseAndValidateForm(r *http.Request) (file multipart.File, header *multipart.FileHeader, postActionID string, err error) {
 	err = r.ParseMultipartForm(h.config.UploadMaxSize)
 	if err != nil {
 		h.logger.Error("failed to parse multipart form", "error", err, "max_size", h.config.UploadMaxSize)
-		return nil, nil, &errors.AppError{Code: http.StatusBadRequest, Message: constants.ErrFileTooLarge, Err: err}
+		return nil, nil, "", &errors.AppError{Code: http.StatusBadRequest, Message: constants.ErrFileTooLarge, Err: err}
 	}
+
+	// Extract post action ID if provided
+	postActionID = r.FormValue(constants.FormFieldPostAction)
 
 	// Try to get file from either 'audio' or 'file' field for backward compatibility
 	file, header, err = r.FormFile(constants.FormFieldAudio)
@@ -128,16 +156,16 @@ func (h *TranscribeHandler) parseAndValidateForm(r *http.Request) (file multipar
 		file, header, err = r.FormFile(constants.FormFieldFile)
 		if err != nil {
 			h.logger.Warn("no file in request", "error", err)
-			return nil, nil, &errors.AppError{Code: http.StatusBadRequest, Message: constants.ErrNoAudioFile, Err: err}
+			return nil, nil, "", &errors.AppError{Code: http.StatusBadRequest, Message: constants.ErrNoAudioFile, Err: err}
 		}
 	}
 
 	if err := h.validator.ValidateFile(header); err != nil {
 		h.logger.Warn("file validation failed", "filename", header.Filename, "error", err)
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
-	return file, header, nil
+	return file, header, postActionID, nil
 }
 
 // processTranscription handles file saving, conversion (if needed), and transcription
@@ -196,6 +224,67 @@ func (h *TranscribeHandler) processTranscription(file multipart.File, header *mu
 	)
 
 	return transcription, duration, nil
+}
+
+// processCustomAction handles processing of custom post-transcription actions
+func (h *TranscribeHandler) processCustomAction(actionID, transcription string, header *multipart.FileHeader, processingTime time.Duration) *service.ActionResult {
+	h.logger.Info("processing custom action", "action_id", actionID, "filename", header.Filename)
+	
+	// Create action context
+	context := &service.ActionContext{
+		Transcript:     transcription,
+		Filename:       header.Filename,
+		Date:           time.Now().Format("2006-01-02"),
+		FileType:       h.getFileType(header.Filename),
+		Duration:       h.formatProcessingTime(processingTime),
+		WordCount:      len(strings.Fields(transcription)),
+		CharCount:      len(transcription),
+		ProcessingTime: h.formatProcessingTime(processingTime),
+	}
+	
+	// Try to find predefined action first
+	action := h.findPredefinedAction(actionID)
+	if action == nil {
+		h.logger.Warn("action not found", "action_id", actionID)
+		return &service.ActionResult{
+			Success:     false,
+			Error:       "Action not found",
+			ActionName:  actionID,
+			ProcessedAt: time.Now(),
+		}
+	}
+	
+	// Process the action using the PostActionService
+	result := h.postActionService.ProcessAction(action, context)
+	
+	h.logger.Info("custom action processed",
+		"action_id", actionID,
+		"success", result.Success,
+		"output_length", len(result.Output),
+		"action_type", result.ActionType,
+	)
+	
+	return result
+}
+
+// findPredefinedAction looks up a predefined action by ID
+func (h *TranscribeHandler) findPredefinedAction(actionID string) *service.CustomAction {
+	predefinedActions := h.postActionService.GetPredefinedActions()
+	
+	for _, action := range predefinedActions {
+		if action.ID == actionID {
+			return &action
+		}
+	}
+	
+	return nil
+}
+
+func (h *TranscribeHandler) formatProcessingTime(duration time.Duration) string {
+	if duration < time.Second {
+		return fmt.Sprintf("%.0fms", float64(duration.Nanoseconds())/1e6)
+	}
+	return fmt.Sprintf("%.1fs", duration.Seconds())
 }
 
 // getFileType determines if the file is audio or video

@@ -20,6 +20,10 @@ func NewTranscriber(apiKey string) *Transcriber {
 	}
 }
 
+func (t *Transcriber) GetClient() *openai.Client {
+	return t.client
+}
+
 func (t *Transcriber) TranscribeFile(ctx context.Context, filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {

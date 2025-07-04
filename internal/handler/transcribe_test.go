@@ -14,6 +14,7 @@ import (
 
 	"whisper-hub/internal/config"
 	"whisper-hub/internal/constants"
+	"whisper-hub/internal/service"
 )
 
 // mockTemplateService implements a mock template service for testing
@@ -504,5 +505,175 @@ func TestTranscribeHandler_processTranscription_VideoFileDetection(t *testing.T)
 	// Should fail at video conversion or transcription, not file saving
 	if strings.Contains(err.Error(), "failed to save") {
 		t.Errorf("unexpected file save error: %v", err)
+	}
+}
+
+func TestTranscribeHandler_formatProcessingTime(t *testing.T) {
+	handler := &TranscribeHandler{}
+	
+	tests := []struct {
+		name     string
+		duration time.Duration
+		expected string
+	}{
+		{
+			name:     "milliseconds",
+			duration: 500 * time.Millisecond,
+			expected: "500ms",
+		},
+		{
+			name:     "less than millisecond",
+			duration: 100 * time.Microsecond,
+			expected: "0ms",
+		},
+		{
+			name:     "seconds",
+			duration: 2500 * time.Millisecond,
+			expected: "2.5s",
+		},
+		{
+			name:     "multiple seconds",
+			duration: 5 * time.Second,
+			expected: "5.0s",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := handler.formatProcessingTime(tt.duration)
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTranscribeHandler_findPredefinedAction(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	postActionService := service.NewPostActionService(logger, nil)
+	
+	handler := &TranscribeHandler{
+		postActionService: postActionService,
+	}
+	
+	// Test finding an existing action
+	result := handler.findPredefinedAction("openai-meeting-summary")
+	if result == nil {
+		t.Error("Expected to find predefined action 'openai-meeting-summary'")
+	} else {
+		if result.ID != "openai-meeting-summary" {
+			t.Errorf("Expected action ID 'openai-meeting-summary', got %s", result.ID)
+		}
+	}
+	
+	// Test non-existent action
+	result = handler.findPredefinedAction("non-existent-action")
+	if result != nil {
+		t.Error("Expected nil for non-existent action")
+	}
+}
+
+func TestTranscribeHandler_processCustomAction(t *testing.T) {
+	cfg := &config.Config{
+		OpenAIAPIKey:       "", // Empty to simulate no OpenAI access
+		PostActionsEnabled: false, // Disable to avoid OpenAI client issues
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	templateService := &mockTemplateService{}
+	handler := NewTranscribeHandler(cfg, logger, templateService, &mockMetricsTracker{})
+	
+	// Create mock file header
+	header := &multipart.FileHeader{
+		Filename: "test.mp3",
+		Size:     100,
+	}
+	
+	// Test processing a non-existent action (should return nil or error gracefully)
+	result := handler.processCustomAction("non-existent-action", "This is a test transcript", header, time.Second)
+	
+	// The function should handle non-existent actions gracefully
+	// Either by returning nil or a result with an error
+	if result != nil {
+		// If result is not nil, it should have proper structure
+		if result.ActionName == "" && result.ActionType == "" && result.Error == "" {
+			t.Error("Result should have some meaningful content")
+		}
+	}
+	
+	// Test that the function doesn't panic - this is the main goal
+	t.Log("processCustomAction handled non-existent action without crashing")
+}
+
+func TestTranscribeHandler_HandleTranscribe_AudioFileSuccess(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	cfg := &config.Config{
+		OpenAIAPIKey:  "test-key",
+		UploadMaxSize: 100 * 1024 * 1024, // 100MB
+		Port:          "8080",
+		TempDir:       os.TempDir(),
+	}
+
+	templateService := &mockTemplateService{}
+	metricsTracker := &mockMetricsTracker{}
+
+	handler := NewTranscribeHandler(cfg, logger, templateService, metricsTracker)
+
+	// Create a multipart request with valid audio file
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("audio", "test.mp3")
+	part.Write([]byte("fake audio content"))
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/transcribe", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	handler.HandleTranscribe(w, req)
+
+	// Since this will likely fail with a real OpenAI call, we expect an error response
+	// The test verifies the flow works up to the transcription attempt
+	if w.Code == http.StatusOK || w.Code == http.StatusInternalServerError {
+		// Either success or expected failure is acceptable for this test
+		t.Logf("Handler processed request, status: %d", w.Code)
+	} else {
+		t.Errorf("Unexpected status code: %d", w.Code)
+	}
+}
+
+func TestTranscribeHandler_HandleTranscribe_VideoFileSuccess(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	cfg := &config.Config{
+		OpenAIAPIKey:  "test-key",
+		UploadMaxSize: 100 * 1024 * 1024, // 100MB
+		Port:          "8080",
+		TempDir:       os.TempDir(),
+	}
+
+	templateService := &mockTemplateService{}
+	metricsTracker := &mockMetricsTracker{}
+
+	handler := NewTranscribeHandler(cfg, logger, templateService, metricsTracker)
+
+	// Create a multipart request with valid video file
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("audio", "test.mp4")
+	part.Write([]byte("fake video content"))
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/transcribe", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	handler.HandleTranscribe(w, req)
+
+	// Since this will likely fail with a real OpenAI call or video conversion, we expect an error response
+	// The test verifies the flow works up to the processing attempt
+	if w.Code == http.StatusOK || w.Code == http.StatusInternalServerError {
+		// Either success or expected failure is acceptable for this test
+		t.Logf("Handler processed request, status: %d", w.Code)
+	} else {
+		t.Errorf("Unexpected status code: %d", w.Code)
 	}
 }

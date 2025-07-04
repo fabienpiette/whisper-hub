@@ -70,6 +70,7 @@ const (
 
 // Form field names
 const (
-	FormFieldAudio = "audio"
-	FormFieldFile  = "file" // Generic field for audio/video files
+	FormFieldAudio      = "audio"
+	FormFieldFile       = "file"        // Generic field for audio/video files
+	FormFieldPostAction = "post_action" // Selected post-processing action
 )

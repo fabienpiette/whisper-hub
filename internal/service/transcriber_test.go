@@ -36,6 +36,15 @@ func TestNewTranscriber(t *testing.T) {
 	}
 }
 
+func TestTranscriber_GetClient(t *testing.T) {
+	transcriber := NewTranscriber("test-key")
+	client := transcriber.GetClient()
+	
+	if client == nil {
+		t.Error("GetClient() should return non-nil client")
+	}
+}
+
 func TestTranscriber_TranscribeFile(t *testing.T) {
 	transcriber := NewTranscriber("test-key")
 

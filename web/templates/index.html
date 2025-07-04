@@ -51,9 +51,31 @@
                     <p class="privacy-note">When enabled, transcripts won't be saved to history</p>
                 </div>
 
+                <!-- Post-Action Selector -->
+                <div class="post-action-section">
+                    <label for="post-action-selector" class="action-label">
+                        <span class="label-text">Post-Transcription Action (Optional)</span>
+                        <span class="label-description">Choose an action to perform after transcription</span>
+                    </label>
+                    <div class="action-selector-group">
+                        <select id="post-action-selector" name="post_action" class="action-selector">
+                            <option value="">No additional action</option>
+                        </select>
+                        <button type="button" id="create-action-btn" class="action-create-btn" title="Create New Action">
+                            <span class="btn-icon">✨</span>
+                            <span class="btn-text">Create</span>
+                        </button>
+                        <button type="button" id="manage-actions-btn" class="action-manage-btn" title="Manage Actions">
+                            <span class="btn-icon">⚙️</span>
+                            <span class="btn-text">Manage</span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- File Upload -->
                 <form id="transcribe-form" hx-post="/transcribe" hx-target="#result-container" hx-encoding="multipart/form-data">
-                    <input type="hidden" name="csrf_token" id="csrf-token" value="{{.CSRFToken}}">`
+                    <input type="hidden" name="csrf_token" id="csrf-token" value="{{.CSRFToken}}">
+                    <input type="hidden" name="post_action" id="post-action-input" value="">`
                     <div class="upload-zone" id="upload-zone">
                         <div class="upload-content">
                             <div class="upload-icon">📎</div>
@@ -169,6 +191,15 @@
                         <span class="setting-label">Enable History</span>
                         <span class="setting-description">Save transcriptions locally</span>
                     </label>
+                </div>
+                
+                <div class="settings-group">
+                    <h3>Custom Actions</h3>
+                    <div class="setting-item">
+                        <span class="setting-label">Create and manage custom post-transcription actions</span>
+                    </div>
+                    <button id="create-action" class="setting-btn">Create New Action</button>
+                    <button id="manage-actions" class="setting-btn">Manage Actions</button>
                 </div>
                 
                 <div class="settings-group">
