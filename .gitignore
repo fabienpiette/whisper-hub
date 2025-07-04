@@ -7,6 +7,7 @@ bin/
 dist/
 transcribe-server
 whisper-hub-server
+server
 
 # Logs
 *.log
