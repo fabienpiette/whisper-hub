@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -628,6 +629,332 @@ func TestTemplateEngine_formatText(t *testing.T) {
 			
 			if tt.input == "" && result != "" {
 				t.Error("Expected empty result for empty input")
+			}
+		})
+	}
+}
+
+func TestPostActionService_processOpenAIAction_ProcessorChecks(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	
+	// Test that the OpenAI processor is correctly initialized
+	service := NewPostActionService(logger, nil)
+	
+	// Verify that the openaiProcessor is not nil (should always be created)
+	if service.openaiProcessor == nil {
+		t.Error("OpenAI processor should not be nil")
+	}
+	
+	// Verify that the client inside the processor is nil when passed nil
+	if service.openaiProcessor.client != nil {
+		t.Error("OpenAI client should be nil when nil client is passed to service")
+	}
+}
+
+func TestPostActionService_processOpenAIAction_EmptyPrompt(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewPostActionService(logger, nil)
+	
+	action := &CustomAction{
+		ID:     "test-empty-prompt",
+		Name:   "Test Empty Prompt",
+		Type:   "openai",
+		Prompt: "", // Empty prompt should cause error
+	}
+	
+	context := &ActionContext{
+		Transcript: "This is a test transcript",
+	}
+	
+	result := &ActionResult{
+		ActionName:  action.Name,
+		ActionType:  action.Type,
+		ProcessedAt: time.Now(),
+	}
+	
+	processedResult := service.processOpenAIAction(action, context, result)
+	
+	// Should fail due to empty prompt
+	if processedResult.Success {
+		t.Error("processOpenAIAction should fail with empty prompt")
+	}
+	
+	if processedResult.Error == "" {
+		t.Error("processOpenAIAction should return error message for empty prompt")
+	}
+	
+	if !strings.Contains(processedResult.Error, "prompt is empty") {
+		t.Errorf("Error should mention empty prompt, got: %s", processedResult.Error)
+	}
+}
+
+func TestOpenAIActionProcessor_ProcessPrompt(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	
+	// Test with nil client (should cause panic - we'll catch it with defer/recover)
+	processor := NewOpenAIActionProcessor(nil, logger)
+	
+	action := &CustomAction{
+		ID:     "test-action",
+		Prompt: "Test prompt",
+		Model:  "gpt-3.5-turbo",
+	}
+	
+	actionContext := &ActionContext{
+		Transcript: "Test transcript",
+	}
+	
+	// Expect this to panic due to nil client
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("ProcessPrompt should panic with nil OpenAI client")
+		}
+	}()
+	
+	ctx := context.Background()
+	processor.ProcessPrompt(ctx, action, actionContext)
+}
+
+func TestPostActionService_ValidateAction_EdgeCases(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewPostActionService(logger, nil)
+	
+	tests := []struct {
+		name        string
+		action      *CustomAction
+		expectError bool
+		errorText   string
+	}{
+		{
+			name: "very long name",
+			action: &CustomAction{
+				Name:     strings.Repeat("a", 101), // Exceeds 100 char limit
+				Type:     "template",
+				Template: "{{.Transcript}}",
+			},
+			expectError: true,
+			errorText:   "name too long",
+		},
+		{
+			name: "very long description",
+			action: &CustomAction{
+				Name:        "Test",
+				Description: strings.Repeat("a", 501), // Exceeds 500 char limit
+				Type:        "template",
+				Template:    "{{.Transcript}}",
+			},
+			expectError: true,
+			errorText:   "description too long",
+		},
+		{
+			name: "very long template",
+			action: &CustomAction{
+				Name:     "Test",
+				Type:     "template",
+				Template: strings.Repeat("a", 10001), // Exceeds 10000 char limit
+			},
+			expectError: true,
+			errorText:   "template too long",
+		},
+		{
+			name: "very long prompt",
+			action: &CustomAction{
+				Name:   "Test",
+				Type:   "openai",
+				Prompt: strings.Repeat("a", 5001), // Exceeds 5000 char limit
+			},
+			expectError: true,
+			errorText:   "prompt too long",
+		},
+		{
+			name: "invalid temperature high",
+			action: &CustomAction{
+				Name:        "Test",
+				Type:        "openai",
+				Prompt:      "Test prompt",
+				Temperature: 2.1, // > 2.0
+			},
+			expectError: true,
+			errorText:   "temperature must be between 0 and 2",
+		},
+		{
+			name: "invalid temperature low",
+			action: &CustomAction{
+				Name:        "Test",
+				Type:        "openai",
+				Prompt:      "Test prompt",
+				Temperature: -0.1, // < 0.0
+			},
+			expectError: true,
+			errorText:   "temperature must be between 0 and 2",
+		},
+		{
+			name: "invalid max tokens high",
+			action: &CustomAction{
+				Name:      "Test",
+				Type:      "openai",
+				Prompt:    "Test prompt",
+				MaxTokens: 4001, // > 4000
+			},
+			expectError: true,
+			errorText:   "max tokens must be between 0 and 4000",
+		},
+		{
+			name: "invalid max tokens low",
+			action: &CustomAction{
+				Name:      "Test",
+				Type:      "openai",
+				Prompt:    "Test prompt",
+				MaxTokens: -1, // < 0
+			},
+			expectError: true,
+			errorText:   "max tokens must be between 0 and 4000",
+		},
+		{
+			name: "invalid openai model",
+			action: &CustomAction{
+				Name:   "Test",
+				Type:   "openai",
+				Prompt: "Test prompt",
+				Model:  "invalid-model-name",
+			},
+			expectError: true,
+			errorText:   "invalid OpenAI model",
+		},
+		{
+			name: "invalid action type",
+			action: &CustomAction{
+				Name: "Test",
+				Type: "invalid-type",
+			},
+			expectError: true,
+			errorText:   "invalid action type",
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := service.ValidateAction(tt.action)
+			
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected validation error but got none")
+				} else if !strings.Contains(err.Error(), tt.errorText) {
+					t.Errorf("Expected error to contain '%s', got: %s", tt.errorText, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no validation error but got: %s", err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestPostActionService_validateTemplate_EdgeCases(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewPostActionService(logger, nil)
+	
+	tests := []struct {
+		name        string
+		template    string
+		expectError bool
+	}{
+		{
+			name:        "valid template with functions",
+			template:    "{{.Transcript | upper}} - {{.WordCount}}",
+			expectError: false,
+		},
+		{
+			name:        "valid template with built-in functions",
+			template:    "{{.Transcript | summarize}} {{date}}",
+			expectError: false,
+		},
+		{
+			name:        "invalid template syntax",
+			template:    "{{.Transcript | invalidFunction}}",
+			expectError: true,
+		},
+		{
+			name:        "unclosed template directive",
+			template:    "{{.Transcript",
+			expectError: true,
+		},
+		{
+			name:        "malformed template",
+			template:    "{{.Transcript | upper | lower | }",
+			expectError: true,
+		},
+		{
+			name:        "empty template",
+			template:    "",
+			expectError: false,  // Empty template is valid for template parsing
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := service.validateTemplate(tt.template)
+			
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected validation error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no validation error but got: %s", err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestPostActionService_isValidOpenAIModel_ExtraCases(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewPostActionService(logger, nil)
+	
+	tests := []struct {
+		name     string
+		model    string
+		expected bool
+	}{
+		{
+			name:     "valid gpt-3.5-turbo",
+			model:    "gpt-3.5-turbo",
+			expected: true,
+		},
+		{
+			name:     "valid gpt-4o",
+			model:    "gpt-4o",
+			expected: true,
+		},
+		{
+			name:     "valid gpt-4o-mini",
+			model:    "gpt-4o-mini",
+			expected: true,
+		},
+		{
+			name:     "invalid custom model",
+			model:    "custom-model-v1",
+			expected: false,
+		},
+		{
+			name:     "empty model",
+			model:    "",
+			expected: false,
+		},
+		{
+			name:     "completely wrong format",
+			model:    "not-a-model",
+			expected: false,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := service.isValidOpenAIModel(tt.model)
+			if result != tt.expected {
+				t.Errorf("isValidOpenAIModel(%q) = %v, want %v", tt.model, result, tt.expected)
 			}
 		})
 	}

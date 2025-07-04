@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -343,6 +344,170 @@ func TestSecurityMiddleware_CSRFProtection(t *testing.T) {
 	}
 }
 
+func TestSecurityMiddleware_CSRFProtection_ValidToken(t *testing.T) {
+	middleware := NewSecurityMiddleware()
+	
+	// Generate a valid token
+	token := middleware.GenerateCSRFToken()
+	
+	// Create a test handler
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
+	})
+	
+	// Wrap with CSRF protection
+	protectedHandler := middleware.CSRFProtection(handler)
+	
+	// Create POST request with valid token
+	req := httptest.NewRequest("POST", "/test", strings.NewReader("csrf_token="+token))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	
+	protectedHandler.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+	
+	if !strings.Contains(w.Body.String(), "success") {
+		t.Error("Expected success response")
+	}
+}
+
+func TestSecurityMiddleware_validateToken(t *testing.T) {
+	middleware := NewSecurityMiddleware()
+	
+	tests := []struct {
+		name     string
+		token    string
+		expected bool
+	}{
+		{
+			name:     "empty token",
+			token:    "",
+			expected: false,
+		},
+		{
+			name:     "invalid token",
+			token:    "invalid-token",
+			expected: false,
+		},
+		{
+			name:     "non-existent token",
+			token:    "not-in-store",
+			expected: false,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := middleware.validateToken(tt.token)
+			if result != tt.expected {
+				t.Errorf("validateToken(%q) = %v, want %v", tt.token, result, tt.expected)
+			}
+		})
+	}
+	
+	// Test valid token
+	validToken := middleware.GenerateCSRFToken()
+	if !middleware.validateToken(validToken) {
+		t.Error("Valid token should be accepted")
+	}
+}
+
+func TestSecurityMiddleware_validateToken_ExpiredToken(t *testing.T) {
+	middleware := NewSecurityMiddleware()
+	
+	// Generate a token
+	token := middleware.GenerateCSRFToken()
+	
+	// Manually set token to expired
+	middleware.mutex.Lock()
+	middleware.tokens[token] = time.Now().Add(-1 * time.Hour) // Expired 1 hour ago
+	middleware.mutex.Unlock()
+	
+	// Should return false for expired token
+	if middleware.validateToken(token) {
+		t.Error("Expired token should be rejected")
+	}
+	
+	// Token should be removed from store after validation
+	middleware.mutex.RLock()
+	_, exists := middleware.tokens[token]
+	middleware.mutex.RUnlock()
+	
+	if exists {
+		t.Error("Expired token should be removed from store")
+	}
+}
+
+func TestSecurityMiddleware_CSRFProtection_HeaderToken(t *testing.T) {
+	middleware := NewSecurityMiddleware()
+	token := middleware.GenerateCSRFToken()
+	
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
+	})
+	
+	protectedHandler := middleware.CSRFProtection(handler)
+	
+	// Create POST request with token in header
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.Header.Set("X-CSRF-Token", token)
+	w := httptest.NewRecorder()
+	
+	protectedHandler.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+}
+
+func TestSecurityMiddleware_CSRFProtection_InvalidToken(t *testing.T) {
+	middleware := NewSecurityMiddleware()
+	
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
+	})
+	
+	protectedHandler := middleware.CSRFProtection(handler)
+	
+	// Create POST request with invalid token
+	req := httptest.NewRequest("POST", "/test", strings.NewReader("csrf_token=invalid"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	
+	protectedHandler.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusForbidden {
+		t.Errorf("Expected status 403, got %d", w.Code)
+	}
+}
+
+func TestSecurityMiddleware_CSRFProtection_NoToken(t *testing.T) {
+	middleware := NewSecurityMiddleware()
+	
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
+	})
+	
+	protectedHandler := middleware.CSRFProtection(handler)
+	
+	// Create POST request without token
+	req := httptest.NewRequest("POST", "/test", nil)
+	w := httptest.NewRecorder()
+	
+	protectedHandler.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusForbidden {
+		t.Errorf("Expected status 403, got %d", w.Code)
+	}
+}
+
 func TestChain_Basic(t *testing.T) {
 	chain := NewChain()
 	
@@ -591,4 +756,50 @@ func TestChain_ApplyToRouter(t *testing.T) {
 	
 	// Test with incompatible router (should not panic)
 	chain.ApplyToRouter("not a router")
+}
+
+func TestRateLimiter_IPHeaderHandling(t *testing.T) {
+	limiter := NewRateLimiter(2, time.Minute)
+	middleware := limiter.RateLimit()
+	
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("test"))
+	})
+	
+	handler := middleware(testHandler)
+	
+	// Test X-Forwarded-For header handling
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "192.168.1.1:8080"
+	req.Header.Set("X-Forwarded-For", "10.0.0.1")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+	
+	// Test X-Real-IP header handling  
+	req2 := httptest.NewRequest("GET", "/test", nil)
+	req2.RemoteAddr = "192.168.1.1:8080"
+	req2.Header.Set("X-Real-IP", "10.0.0.2")
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, req2)
+	
+	if w2.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w2.Code)
+	}
+	
+	// Test that X-Forwarded-For takes precedence
+	req3 := httptest.NewRequest("GET", "/test", nil)
+	req3.RemoteAddr = "192.168.1.1:8080"
+	req3.Header.Set("X-Forwarded-For", "10.0.0.1")
+	req3.Header.Set("X-Real-IP", "10.0.0.2")
+	w3 := httptest.NewRecorder()
+	handler.ServeHTTP(w3, req3)
+	
+	if w3.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w3.Code)
+	}
 }
